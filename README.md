@@ -1,6 +1,6 @@
 [![depth-of-field-proof-of-concept](app/opengraph-image.jpg)](https://depth-of-field.vercel.app/)
 
-This is a proof of concept. Most of the code is in the [`/app/page.tsx`](https://github.com/javierbyte/depth-of-field/blob/main/app/page.tsx) page.
+This is a proof of concept. Most of the code is in the [`/app/page.tsx`](https://github.com/javierbyte/depth-of-field/blob/main/app/page.tsx) page. Inspired by [Frosted Glass](https://frosted-glass.shud.in/) by [Shuding](https://twitter.com/shuding_).
 
 ## Getting Started
 
