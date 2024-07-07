@@ -13,32 +13,74 @@ import {
 } from "@/components/ui/select";
 
 const CSS_PERSPECTIVE = 1080;
-const MAX_BLUR = 16;
 const SPRING_TENSION = 0.8;
-const PAN_RANGE = -100;
+const WEAK_SPRING_TENSION = 0.95;
+
+const DEFAULT_SEPARATION: number = 8;
+
+const BLUR_OPTION = {
+  "No Blur": undefined,
+  "Back focus": [0, 1, 2, 4, 5],
+  "Close focus": [5, 4, 2, 1, 0],
+} as const;
 
 export default function Home() {
   const dataRef = useRef({
-    globalAperture: 1.4,
+    layerSeparation: DEFAULT_SEPARATION,
+    renderLayerSeparation: 0,
+    blur: "No Blur",
     forceRender: false,
     targetX: -0.22,
     targetY: -0.1,
     renderX: 0,
     renderY: 0,
   });
-  const [aperture, setAperture] = useState(1.4);
-  const [photo, setPhoto] = useState<keyof typeof photos>("Berlin");
+  const [photo, setPhoto] = useState<keyof typeof photos>("Tokyo Tower");
+
+  const [layerSeparationUI, setLayerSeparationUI] =
+    useState(DEFAULT_SEPARATION);
+
+  const [blurUI, setBlurUI] = useState("No Blur");
 
   const photoData = photos[photo];
 
   useEffect(() => {
     const imgContainer = document.querySelector<HTMLElement>(".frame");
 
-    const imgFar = document.querySelector<HTMLElement>("#imageFar");
-    const imgMedium = document.querySelector<HTMLElement>("#imageMedium");
-    const img = document.querySelector<HTMLElement>("#image");
+    if (!imgContainer) {
+      return;
+    }
 
-    if (!imgContainer || !imgFar || !img || !imgMedium) {
+    const imgEl1 = imgContainer.querySelectorAll("img")[1];
+    const imgEl2 = imgContainer.querySelectorAll("img")[2];
+    const imgEl3 = imgContainer.querySelectorAll("img")[3];
+    const imgEl4 = imgContainer.querySelectorAll("img")[4];
+
+    imgEl1.style.maskImage = `url(${photoData.depth[0]})`;
+    imgEl1.style.maskSize = "cover";
+    imgEl1.style.maskPosition = "center";
+    imgEl1.style.maskRepeat = "no-repeat";
+
+    imgEl2.style.maskImage = `url(${photoData.depth[1]})`;
+    imgEl2.style.maskSize = "cover";
+    imgEl2.style.maskPosition = "center";
+    imgEl2.style.maskRepeat = "no-repeat";
+
+    imgEl3.style.maskImage = `url(${photoData.depth[2]})`;
+    imgEl3.style.maskSize = "cover";
+    imgEl3.style.maskPosition = "center";
+    imgEl3.style.maskRepeat = "no-repeat";
+
+    imgEl4.style.maskImage = `url(${photoData.depth[3]})`;
+    imgEl4.style.maskSize = "cover";
+    imgEl4.style.maskPosition = "center";
+    imgEl4.style.maskRepeat = "no-repeat";
+  }, [photo]);
+
+  useEffect(() => {
+    const imgContainer = document.querySelector<HTMLElement>(".frame");
+
+    if (!imgContainer) {
       return;
     }
 
@@ -60,7 +102,19 @@ export default function Home() {
 
     function updateStyles() {
       const data = dataRef.current;
-      if (!imgContainer || !imgFar || !img || !imgMedium) {
+      if (!imgContainer) {
+        return;
+      }
+
+      const imgEls = imgContainer.querySelectorAll("img");
+
+      const imgElBase = imgEls[0];
+      const imgEl1 = imgEls[1];
+      const imgEl2 = imgEls[2];
+      const imgEl3 = imgEls[3];
+      const imgEl4 = imgEls[4];
+
+      if (!imgElBase || !imgEl1 || !imgEl2 || !imgEl3 || !imgEl4) {
         return;
       }
 
@@ -79,92 +133,49 @@ export default function Home() {
       data.renderY =
         data.renderY * SPRING_TENSION + data.targetY * (1 - SPRING_TENSION);
 
+      data.renderLayerSeparation =
+        data.renderLayerSeparation * WEAK_SPRING_TENSION +
+        data.layerSeparation * (1 - WEAK_SPRING_TENSION);
+
       const x = data.renderX * 0.618;
       const y = data.renderY * 0.618;
-
-      const angle = Math.atan2(y, x);
-      const angleDeg = Math.round(((angle * 180) / Math.PI + 90) * 1000) / 1000;
 
       const xDeg = Math.round(x * 180 * 1000) / 1000;
       const yDeg = Math.round(-y * 180 * 1000) / 1000;
 
-      const isSmallScreen = window.innerWidth < 768;
+      const offset = data.renderLayerSeparation;
 
-      if (isSmallScreen) {
-        imgContainer.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg)`;
+      if (data.blur !== "No Blur") {
+        // @ts-ignore
+        const blurScale = BLUR_OPTION[data.blur];
+        if (blurScale) {
+          imgElBase.style.filter = `blur(${blurScale[0]}px)`;
+          imgEl1.style.filter = `blur(${blurScale[1]}px)`;
+          imgEl2.style.filter = `blur(${blurScale[2]}px)`;
+          imgEl3.style.filter = `blur(${blurScale[3]}px)`;
+          imgEl4.style.filter = `blur(${blurScale[4]}px)`;
+        }
       } else {
-        imgContainer.style.transform = `translatex(${
-          x * PAN_RANGE
-        }px) translatey(${
-          -y * -PAN_RANGE
-        }px) perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg)`;
+        imgElBase.style.filter = "";
+        imgEl1.style.filter = "";
+        imgEl2.style.filter = "";
+        imgEl3.style.filter = "";
+        imgEl4.style.filter = "";
       }
 
-      const blurIntensity =
-        (Math.sqrt(Math.pow(xDeg, 2) + Math.pow(yDeg, 2)) /
-          data.globalAperture) *
-          0.4 -
-        1;
-
-      const finalBlur = Math.max(Math.min(blurIntensity, MAX_BLUR), 0);
-
-      const mask = `linear-gradient(
-        ${angleDeg}deg,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 0) 20%,
-        rgba(0, 0, 0, 1) 35%,
-        rgba(0, 0, 0, 1) 65%,
-        rgba(0, 0, 0, 0) 80%,
-        rgba(0, 0, 0, 0) 100%
-      )`;
-
-      img.style.maskImage = mask;
-
-      const mediumMask =
-        data.globalAperture < 1
-          ? `linear-gradient(
-        ${angleDeg}deg,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, 1) 40%,
-        rgba(0, 0, 0, 0) 48%,
-        rgba(0, 0, 0, 0) 53%,
-        rgba(0, 0, 0, 1) 60%,
-        rgba(0, 0, 0, 1) 100%
-      )`
-          : `linear-gradient(
-        ${angleDeg}deg,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, 1) 35%,
-        rgba(0, 0, 0, 0) 45%,
-        rgba(0, 0, 0, 0) 55%,
-        rgba(0, 0, 0, 1) 65%,
-        rgba(0, 0, 0, 1) 100%
-      )`;
-      imgMedium.style.maskImage = mediumMask;
-      imgMedium.style.filter = `blur(${finalBlur * 0.5}px)`;
-
-      const maskFar =
-        data.globalAperture < 1
-          ? `linear-gradient(
-        ${angleDeg}deg,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, 1) 25%,
-        rgba(0, 0, 0, 0) 35%,
-        rgba(0, 0, 0, 0) 65%,
-        rgba(0, 0, 0, 1) 75%,
-        rgba(0, 0, 0, 1) 100%
-      )`
-          : `linear-gradient(
-        ${angleDeg}deg,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, 1) 20%,
-        rgba(0, 0, 0, 0) 30%,
-        rgba(0, 0, 0, 0) 70%,
-        rgba(0, 0, 0, 1) 80%,
-        rgba(0, 0, 0, 1) 100%
-      )`;
-      imgFar.style.maskImage = maskFar;
-      imgFar.style.filter = `blur(${finalBlur}px)`;
+      imgElBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg)`;
+      imgEl1.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+        offset * 1
+      }px)`;
+      imgEl2.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+        offset * 2
+      }px)`;
+      imgEl3.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+        offset * 3
+      }px)`;
+      imgEl4.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+        offset * 4
+      }px)`;
 
       window.requestAnimationFrame(updateStyles);
     }
@@ -206,23 +217,55 @@ export default function Home() {
         </Select>
 
         <Select
-          value={String(aperture)}
+          value={String(layerSeparationUI)}
           onValueChange={(e) => {
-            dataRef.current.globalAperture = Number(e);
+            dataRef.current.layerSeparation = Number(e);
             dataRef.current.forceRender = true;
-            setAperture(Number(e));
+            setLayerSeparationUI(Number(e));
           }}
         >
-          <SelectTrigger className="w-[80px]">
-            <SelectValue placeholder="Change aperture" />
+          <SelectTrigger className="w-[72px]">
+            <SelectValue placeholder="Layer Separation" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="0.95">ƒ0.95</SelectItem>
-              <SelectItem value="1.4">ƒ1.4</SelectItem>
-              <SelectItem value="2">ƒ2</SelectItem>
-              <SelectItem value="4">ƒ4</SelectItem>
-              <SelectItem value="8">ƒ8</SelectItem>
+              {/* title */}
+              <SelectItem disabled value="Layer Separation">
+                Layer Separation
+              </SelectItem>
+              <SelectItem value="0">0px</SelectItem>
+              <SelectItem value="4">4px</SelectItem>
+              <SelectItem value="8">8px</SelectItem>
+              <SelectItem value="16">16px</SelectItem>
+              <SelectItem value="32">32px</SelectItem>
+              <SelectItem value="-32">-32px</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={String(blurUI)}
+          onValueChange={(e) => {
+            dataRef.current.blur = e;
+            dataRef.current.forceRender = true;
+
+            // also reset layer separation to 0
+            dataRef.current.layerSeparation = 0;
+            setLayerSeparationUI(0);
+
+            setBlurUI(e);
+          }}
+        >
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Blur" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {Object.keys(BLUR_OPTION).map((key) => (
+                <SelectItem key={key} value={key}>
+                  {key}
+                </SelectItem>
+              ))}
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -248,20 +291,35 @@ export default function Home() {
           id="image"
           alt=""
           className="absolute top-0 left-0 opacity-100"
-          src={photoData.src[0]}
+          src={photoData.src}
         />
 
         <img
-          id="imageMedium"
+          id="image-0"
           alt=""
           className="absolute top-0 left-0 opacity-100"
-          src={photoData.src[1]}
+          src={photoData.src}
         />
+
         <img
-          id="imageFar"
+          id="image-1"
           alt=""
           className="absolute top-0 left-0 opacity-100"
-          src={photoData.src[2]}
+          src={photoData.src}
+        />
+
+        <img
+          id="image-2"
+          alt=""
+          className="absolute top-0 left-0 opacity-100"
+          src={photoData.src}
+        />
+
+        <img
+          id="image-3"
+          alt=""
+          className="absolute top-0 left-0 opacity-100"
+          src={photoData.src}
         />
       </div>
     </>
@@ -269,19 +327,22 @@ export default function Home() {
 }
 
 const photos = {
-  Berlin: {
-    src: ["/berlin-1.jpg", "/berlin-1.jpg", "/berlin-1.jpg"],
+  "Tokyo Tower": {
+    src: "/3d/2.jpg",
+    depth: [
+      "/3d/2-depth-3.png",
+      "/3d/2-depth-2.png",
+      "/3d/2-depth-1.png",
+      "/3d/2-depth-0.png",
+    ],
   },
-  Schwerin: {
-    src: ["/schwerin-1.jpg", "/schwerin-1.jpg", "/schwerin-1.jpg"],
-  },
-  Brutalita: {
-    src: ["/brutalita-1.jpg", "/brutalita-1.jpg", "/brutalita-1.jpg"],
-  },
-  "Todos Santos": {
-    src: ["todos-santos-1.jpg", "todos-santos-1.jpg", "todos-santos-1.jpg"],
-  },
-  "Debug Layers": {
-    src: ["/solid-1.png", "/solid-2.png", "/solid-3.png"],
+  Osaka: {
+    src: "/3d/1.jpg",
+    depth: [
+      "/3d/1-depth-3.png",
+      "/3d/1-depth-2.png",
+      "/3d/1-depth-1.png",
+      "/3d/1-depth-0.png",
+    ],
   },
 } as const;
