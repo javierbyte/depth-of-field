@@ -20,8 +20,8 @@ const DEFAULT_SEPARATION: number = 8;
 
 const BLUR_OPTION = {
   "No Blur": undefined,
-  "Back focus": [0, 1, 2, 4, 5],
-  "Close focus": [5, 4, 2, 1, 0],
+  "Back focus": [0, 0.5, 1, 2, 3, 4],
+  "Close focus": [4, 3, 2, 1, 0.5, 0],
 } as const;
 
 export default function Home() {
@@ -43,39 +43,6 @@ export default function Home() {
   const [blurUI, setBlurUI] = useState("No Blur");
 
   const photoData = photos[photo];
-
-  useEffect(() => {
-    const imgContainer = document.querySelector<HTMLElement>(".frame");
-
-    if (!imgContainer) {
-      return;
-    }
-
-    const imgEl1 = imgContainer.querySelectorAll("img")[1];
-    const imgEl2 = imgContainer.querySelectorAll("img")[2];
-    const imgEl3 = imgContainer.querySelectorAll("img")[3];
-    const imgEl4 = imgContainer.querySelectorAll("img")[4];
-
-    imgEl1.style.maskImage = `url(${photoData.depth[0]})`;
-    imgEl1.style.maskSize = "cover";
-    imgEl1.style.maskPosition = "center";
-    imgEl1.style.maskRepeat = "no-repeat";
-
-    imgEl2.style.maskImage = `url(${photoData.depth[1]})`;
-    imgEl2.style.maskSize = "cover";
-    imgEl2.style.maskPosition = "center";
-    imgEl2.style.maskRepeat = "no-repeat";
-
-    imgEl3.style.maskImage = `url(${photoData.depth[2]})`;
-    imgEl3.style.maskSize = "cover";
-    imgEl3.style.maskPosition = "center";
-    imgEl3.style.maskRepeat = "no-repeat";
-
-    imgEl4.style.maskImage = `url(${photoData.depth[3]})`;
-    imgEl4.style.maskSize = "cover";
-    imgEl4.style.maskPosition = "center";
-    imgEl4.style.maskRepeat = "no-repeat";
-  }, [photo]);
 
   useEffect(() => {
     const imgContainer = document.querySelector<HTMLElement>(".frame");
@@ -113,6 +80,7 @@ export default function Home() {
       const imgEl2 = imgEls[2];
       const imgEl3 = imgEls[3];
       const imgEl4 = imgEls[4];
+      const imgEl5 = imgEls[5];
 
       if (!imgElBase || !imgEl1 || !imgEl2 || !imgEl3 || !imgEl4) {
         return;
@@ -154,6 +122,7 @@ export default function Home() {
           imgEl2.style.filter = `blur(${blurScale[2]}px)`;
           imgEl3.style.filter = `blur(${blurScale[3]}px)`;
           imgEl4.style.filter = `blur(${blurScale[4]}px)`;
+          imgEl5 && (imgEl5.style.filter = `blur(${blurScale[5]}px)`);
         }
       } else {
         imgElBase.style.filter = "";
@@ -161,6 +130,7 @@ export default function Home() {
         imgEl2.style.filter = "";
         imgEl3.style.filter = "";
         imgEl4.style.filter = "";
+        imgEl5 && (imgEl5.style.filter = "");
       }
 
       imgElBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg)`;
@@ -176,6 +146,10 @@ export default function Home() {
       imgEl4.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
         offset * 4
       }px)`;
+      imgEl5 &&
+        (imgEl5.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+          offset * 5
+        }px)`);
 
       window.requestAnimationFrame(updateStyles);
     }
@@ -238,7 +212,7 @@ export default function Home() {
               <SelectItem value="8">8px</SelectItem>
               <SelectItem value="16">16px</SelectItem>
               <SelectItem value="32">32px</SelectItem>
-              <SelectItem value="-32">-32px</SelectItem>
+              <SelectItem value="64">64px</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -248,8 +222,6 @@ export default function Home() {
           onValueChange={(e) => {
             dataRef.current.blur = e;
             dataRef.current.forceRender = true;
-
-            // also reset layer separation to 0
             dataRef.current.layerSeparation = 0;
             setLayerSeparationUI(0);
 
@@ -290,38 +262,39 @@ export default function Home() {
         <img
           id="image"
           alt=""
-          className="absolute top-0 left-0 opacity-100"
+          className="absolute top-0 left-0 opacity-100 layer layer-masked"
           src={photoData.src}
         />
 
-        <img
-          id="image-0"
-          alt=""
-          className="absolute top-0 left-0 opacity-100"
-          src={photoData.src}
-        />
-
-        <img
-          id="image-1"
-          alt=""
-          className="absolute top-0 left-0 opacity-100"
-          src={photoData.src}
-        />
-
-        <img
-          id="image-2"
-          alt=""
-          className="absolute top-0 left-0 opacity-100"
-          src={photoData.src}
-        />
-
-        <img
-          id="image-3"
-          alt=""
-          className="absolute top-0 left-0 opacity-100"
-          src={photoData.src}
-        />
+        {photoData.depth.map((depth, i) => (
+          <img
+            key={i}
+            id={`image-${i}`}
+            alt=""
+            className="absolute top-0 left-0 opacity-100 layer layer-masked"
+            src={photoData.src}
+            style={{
+              maskImage: `url(${depth})`,
+            }}
+          />
+        ))}
       </div>
+
+      {/* {photoData.depth.map((depth, i) => (
+        <img
+          key={i}
+          id={`image-${i}`}
+          width="250"
+          height="200"
+          style={{
+            width: "200px",
+            height: "250px",
+          }}
+          alt=""
+          className="top-0 left-0 opacity-100 layer layer-masked inline-block"
+          src={depth}
+        />
+      ))} */}
     </>
   );
 }
@@ -330,19 +303,21 @@ const photos = {
   "Tokyo Tower": {
     src: "/3d/2.jpg",
     depth: [
-      "/3d/2-depth-3.png",
-      "/3d/2-depth-2.png",
-      "/3d/2-depth-1.png",
-      "/3d/2-depth-0.png",
+      "/depth/2.jpg?contrast=2&brightness=8",
+      "/depth/2.jpg?contrast=2&brightness=6",
+      "/depth/2.jpg?contrast=2&brightness=4",
+      "/depth/2.jpg?contrast=2&brightness=2",
+      "/depth/2.jpg?contrast=2&brightness=1",
     ],
   },
   Osaka: {
     src: "/3d/1.jpg",
     depth: [
-      "/3d/1-depth-3.png",
-      "/3d/1-depth-2.png",
-      "/3d/1-depth-1.png",
-      "/3d/1-depth-0.png",
+      "/depth/1.jpg?contrast=2&brightness=4",
+      "/depth/1.jpg?contrast=2&brightness=3",
+      "/depth/1.jpg?contrast=2&brightness=2",
+      "/depth/1.jpg?contrast=2&brightness=1",
+      "/depth/1.jpg?contrast=2&brightness=0.5",
     ],
   },
 } as const;
