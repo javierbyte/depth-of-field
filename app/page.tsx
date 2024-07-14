@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, use } from "react";
 
 import {
   Select,
@@ -12,11 +12,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { depthSlicer } from "./lib/slice";
+
 const CSS_PERSPECTIVE = 1080;
+
 const SPRING_TENSION = 0.8;
 const WEAK_SPRING_TENSION = 0.95;
 
-const DEFAULT_SEPARATION: number = 8;
+const DEFAULT_SEPARATION: number = 12;
 
 const BLUR_OPTION = {
   "No Blur": undefined,
@@ -35,7 +38,30 @@ export default function Home() {
     renderX: 0,
     renderY: 0,
   });
-  const [photo, setPhoto] = useState<keyof typeof photos>("Tokyo Tower");
+  const [photo, setPhoto] = useState<keyof typeof photos>("tokyo");
+  const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
+
+  const [isReady, setIsReady] = useState<null | string>(null);
+
+  useEffect(() => {
+    async function updateDepthLayers(depthSrc: string) {
+      const overlap = 5; // important
+      const slices = 5;
+      const availableSolidRange = 100 - overlap * (slices - 1);
+      const solidRange = availableSolidRange / slices; // important
+
+      const newDepthMap = await depthSlicer(depthSrc, [
+        [0, solidRange + overlap],
+        [solidRange, solidRange * 2 + overlap * 2],
+        [solidRange * 2 + overlap, solidRange * 3 + overlap * 3],
+        [solidRange * 3 + overlap * 2, solidRange * 4 + overlap * 4],
+        [solidRange * 4 + overlap * 3, solidRange * 5 + overlap * 4],
+      ]);
+      setPhotoDepthMap(newDepthMap);
+      setIsReady(depthSrc);
+    }
+    updateDepthLayers(photos[photo].depthSrc);
+  }, [photo]);
 
   const [layerSeparationUI, setLayerSeparationUI] =
     useState(DEFAULT_SEPARATION);
@@ -133,22 +159,24 @@ export default function Home() {
         imgEl5 && (imgEl5.style.filter = "");
       }
 
-      imgElBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg)`;
+      imgElBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+        offset * -1
+      }px)`;
       imgEl1.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 1
+        offset * 0
       }px)`;
       imgEl2.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 2
+        offset * 1
       }px)`;
       imgEl3.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 3
+        offset * 2
       }px)`;
       imgEl4.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 4
+        offset * 3
       }px)`;
       imgEl5 &&
         (imgEl5.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-          offset * 5
+          offset * 4
         }px)`);
 
       window.requestAnimationFrame(updateStyles);
@@ -161,7 +189,7 @@ export default function Home() {
     });
 
     updateStyles();
-  }, []);
+  }, [isReady]);
 
   return (
     <>
@@ -210,6 +238,7 @@ export default function Home() {
               <SelectItem value="0">0px</SelectItem>
               <SelectItem value="4">4px</SelectItem>
               <SelectItem value="8">8px</SelectItem>
+              <SelectItem value="12">12px</SelectItem>
               <SelectItem value="16">16px</SelectItem>
               <SelectItem value="32">32px</SelectItem>
               <SelectItem value="64">64px</SelectItem>
@@ -266,12 +295,13 @@ export default function Home() {
           src={photoData.src}
         />
 
-        {photoData.depth.map((depth, i) => (
+        {photoDepthMap.map((depth, i) => (
           <img
             key={i}
             id={`image-${i}`}
             alt=""
             className="absolute top-0 left-0 opacity-100 layer layer-masked"
+            // src={depth}
             src={photoData.src}
             style={{
               maskImage: `url(${depth})`,
@@ -280,44 +310,82 @@ export default function Home() {
         ))}
       </div>
 
-      {/* {photoData.depth.map((depth, i) => (
-        <img
-          key={i}
-          id={`image-${i}`}
-          width="250"
-          height="200"
-          style={{
-            width: "200px",
-            height: "250px",
-          }}
-          alt=""
-          className="top-0 left-0 opacity-100 layer layer-masked inline-block"
-          src={depth}
-        />
-      ))} */}
+      <div
+        // shoiw onl;y on desktop
+        className="flex-col align-center hidden md:flex"
+        style={{
+          position: "fixed",
+          height: "100vh",
+          overflowY: "auto",
+          overflowX: "hidden",
+          gap: 4,
+          top: 0,
+          right: 0,
+          width: 80 * 2 + 16,
+          padding: "16px 8px 32px",
+          backgroundColor: "#ecf0f1",
+        }}
+      >
+        {/* <img
+            alt=""
+            className="layer layer-masked"
+            style={{
+              display: "inline-block",
+              width: 80 * 2,
+              height: 100 * 2,
+              margin: 4,
+            }}
+            src={photoData.depthSrc}
+          /> */}
+
+        {photoDepthMap.map((layer, i) => (
+          <img
+            key={i}
+            id={`image-${i}`}
+            alt=""
+            className="layer layer-masked"
+            style={{
+              backgroundColor: "#808080",
+              display: "inline-block",
+              width: 80 * 2,
+              height: 100 * 2,
+            }}
+            src={layer}
+          />
+        ))}
+      </div>
     </>
   );
 }
 
 const photos = {
-  "Tokyo Tower": {
-    src: "/3d/2.jpg",
-    depth: [
-      "/depth/2.jpg?contrast=2&brightness=8",
-      "/depth/2.jpg?contrast=2&brightness=6",
-      "/depth/2.jpg?contrast=2&brightness=4",
-      "/depth/2.jpg?contrast=2&brightness=2",
-      "/depth/2.jpg?contrast=2&brightness=1",
-    ],
+  tokyo: {
+    src: "/3d/tokyo.jpg",
+    depthSrc: "/3d/tokyo-depth.png",
   },
-  Osaka: {
-    src: "/3d/1.jpg",
-    depth: [
-      "/depth/1.jpg?contrast=2&brightness=4",
-      "/depth/1.jpg?contrast=2&brightness=3",
-      "/depth/1.jpg?contrast=2&brightness=2",
-      "/depth/1.jpg?contrast=2&brightness=1",
-      "/depth/1.jpg?contrast=2&brightness=0.5",
-    ],
+
+  mallorca: {
+    src: "/3d/mallorca.jpg",
+    depthSrc: "/3d/mallorca-depth.png",
+  },
+
+  angel: {
+    src: "/3d/angel.jpg",
+    depthSrc: "/3d/angel-depth.png",
+  },
+
+  ml: {
+    src: "/3d/ml.jpg",
+    depthSrc: "/3d/ml-depth.png",
+  },
+
+  osaka: {
+    src: "/3d/osaka.jpg",
+    depthSrc: "/3d/osaka-depth.png",
+  },
+
+  ginza: {
+    src: "/3d/ginza.jpg",
+    depthSrc: "/3d/ginza-depth.png",
   },
 } as const;

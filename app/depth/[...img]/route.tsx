@@ -1,11 +1,15 @@
 import { ImageResponse } from "next/og";
 
-const WIDTH = 400 * 1.5;
-const HEIGHT = 500 * 1.5;
+const WIDTH = 400 * 2;
+const HEIGHT = 500 * 2;
 
 const depths = {
-  "2.jpg": "2-depth-src.png",
-  "1.jpg": "1-depth-src.png",
+  "angel.jpg": "angel-depth.png",
+  "tokyo.jpg": "tokyo-depth.png",
+  "ml.jpg": "ml-depth.png",
+  "osaka.jpg": "osaka-depth.png",
+  "ginza.jpg": "ginza-depth.png",
+  "mallorca.jpg": "mallorca-depth.png",
 } as const;
 
 export async function GET(request: Request) {
@@ -27,14 +31,29 @@ export async function GET(request: Request) {
 
   return new ImageResponse(
     (
-      <img
-        src={`https://depth-of-field-git-test-3d-borquez.vercel.app/3d/${img}`}
-        style={{
-          filter: `brightness(${brightness}) contrast(${contrast})`,
-        }}
-        width={WIDTH}
-        height={HEIGHT}
-      />
+      <>
+        <img
+          src={`https://depth-of-field-8vawwj81i-borquez.vercel.app/3d/${img}`}
+          style={{
+            filter: `brightness(${brightness}) contrast(${contrast})`,
+          }}
+          width={WIDTH}
+          height={HEIGHT}
+        />
+        {new Array(1024 * 0).fill(0).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: 4,
+              height: 4,
+              background: "black",
+              position: "absolute",
+              top: Math.floor(HEIGHT * Math.random()),
+              left: Math.floor(WIDTH * Math.random()),
+            }}
+          />
+        ))}
+      </>
     ),
     {
       width: WIDTH,

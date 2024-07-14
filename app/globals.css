@@ -89,11 +89,17 @@ body {
   --height: 500px;
 }
 
+.layer {
+  filter: blur(0px);
+  transform: perspective(1080px) rotateX(0deg) rotateY(0deg);
+  will-change: filter, transform;
+}
+
 .layer-masked {
   mask-size: cover;
   mask-position: center;
   mask-repeat: no-repeat;
-  mask-mode: luminance;
+  /* mask-mode: luminance; */
 }
 
 .frame {
