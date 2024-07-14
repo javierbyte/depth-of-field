@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState, useRef, use } from "react";
+import { useEffect, useState, useRef } from "react";
 
 import {
   Select,
@@ -21,6 +21,9 @@ const WEAK_SPRING_TENSION = 0.95;
 
 const DEFAULT_SEPARATION: number = 12;
 
+const SLICES = 12;
+const SLICE_SPREAD = 0.5;
+
 const BLUR_OPTION = {
   "No Blur": undefined,
   "Back focus": [0, 0, 1, 2, 3, 4],
@@ -29,12 +32,12 @@ const BLUR_OPTION = {
 
 export default function Home() {
   const dataRef = useRef({
-    layerSeparation: DEFAULT_SEPARATION,
+    layerSeparation: 0,
     renderLayerSeparation: 0,
     blur: "No Blur",
     forceRender: false,
-    targetX: -0.22,
-    targetY: -0.1,
+    targetX: 0,
+    targetY: 0,
     renderX: 0,
     renderY: 0,
   });
@@ -45,22 +48,26 @@ export default function Home() {
 
   useEffect(() => {
     async function updateDepthLayers(depthSrc: string) {
-      const overlap = 5;
-      const slices = 5;
-      const availableSolidRange = 100 - overlap * (slices - 1);
-      const solidRange = availableSolidRange / slices; // important
+      const sliceArr: [number, number][] = new Array(SLICES)
+        .fill(0)
+        .map((_, i) => {
+          const progress = ((i + 0.5) / SLICES) * 100;
+          const sliceDiff = (100 / SLICES) * SLICE_SPREAD;
+          // return [(0 + progress * 2) / 3, (100 + progress * 2) / 3];
+          return [
+            Math.max(progress - sliceDiff),
+            Math.min(progress + sliceDiff, 100),
+          ];
+          // return [progress, progress];
+        });
 
-      const newDepthMap = await depthSlicer(
-        depthSrc,
-        [
-          [0, solidRange + overlap],
-          [solidRange, solidRange * 2 + overlap * 2],
-          [solidRange * 2 + overlap, solidRange * 3 + overlap * 3],
-          [solidRange * 3 + overlap * 2, solidRange * 4 + overlap * 4],
-          [solidRange * 4 + overlap * 3, solidRange * 5 + overlap * 4],
-        ],
-        (b) => b * 1.25
-      );
+      const newDepthMap = await depthSlicer(depthSrc, sliceArr);
+
+      if (dataRef.current.layerSeparation === 0) {
+        setLayerSeparationUI(DEFAULT_SEPARATION);
+        dataRef.current.layerSeparation = DEFAULT_SEPARATION;
+        dataRef.current.renderLayerSeparation = 0;
+      }
       setPhotoDepthMap(newDepthMap);
       setIsReady(depthSrc);
     }
@@ -103,16 +110,12 @@ export default function Home() {
         return;
       }
 
-      const imgEls = imgContainer.querySelectorAll("img");
+      const allImgElements = imgContainer.querySelectorAll("img");
 
-      const imgElBase = imgEls[0];
-      const imgEl1 = imgEls[1];
-      const imgEl2 = imgEls[2];
-      const imgEl3 = imgEls[3];
-      const imgEl4 = imgEls[4];
-      const imgEl5 = imgEls[5];
+      const imgLayerBase = allImgElements[0];
+      const imgLayers = Array.from(allImgElements).slice(1);
 
-      if (!imgElBase || !imgEl1 || !imgEl2 || !imgEl3 || !imgEl4) {
+      if (!imgLayerBase) {
         return;
       }
 
@@ -120,7 +123,7 @@ export default function Home() {
         Math.abs(data.targetX - data.renderX) +
         Math.abs(data.targetY - data.renderY);
 
-      if (totalDiff < 0.02 && !data.forceRender) {
+      if (totalDiff < 0.0001 && !data.forceRender) {
         data.forceRender = false;
         window.requestAnimationFrame(updateStyles);
         return;
@@ -138,50 +141,23 @@ export default function Home() {
       const x = data.renderX * 0.618;
       const y = data.renderY * 0.618;
 
-      const xDeg = Math.round(x * 180 * 1000) / 1000;
-      const yDeg = Math.round(-y * 180 * 1000) / 1000;
+      const xDeg = Math.round(x * 180 * 100) / 100;
+      const yDeg = Math.round(-y * 180 * 100) / 100;
 
       const offset = data.renderLayerSeparation;
+      const baseOffset = -2;
 
-      if (data.blur !== "No Blur") {
-        // @ts-ignore
-        const blurScale = BLUR_OPTION[data.blur];
-        if (blurScale) {
-          imgElBase.style.filter = `blur(${blurScale[0]}px)`;
-          imgEl1.style.filter = `blur(${blurScale[1]}px)`;
-          imgEl2.style.filter = `blur(${blurScale[2]}px)`;
-          imgEl3.style.filter = `blur(${blurScale[3]}px)`;
-          imgEl4.style.filter = `blur(${blurScale[4]}px)`;
-          imgEl5 && (imgEl5.style.filter = `blur(${blurScale[5]}px)`);
-        }
-      } else {
-        imgElBase.style.filter = "";
-        imgEl1.style.filter = "";
-        imgEl2.style.filter = "";
-        imgEl3.style.filter = "";
-        imgEl4.style.filter = "";
-        imgEl5 && (imgEl5.style.filter = "");
+      imgLayerBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+        offset * baseOffset
+      }px)`;
+
+      for (let i = 0; i < imgLayers.length; i++) {
+        // hack - first layer looks better if it is closer than the others
+        const imgLayer = imgLayers[i];
+        imgLayer.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
+          offset * (baseOffset + i + 0.5)
+        }px)`;
       }
-
-      imgElBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * -1
-      }px)`;
-      imgEl1.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 0
-      }px)`;
-      imgEl2.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 1
-      }px)`;
-      imgEl3.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 2
-      }px)`;
-      imgEl4.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * 3
-      }px)`;
-      imgEl5 &&
-        (imgEl5.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-          offset * 4
-        }px)`);
 
       window.requestAnimationFrame(updateStyles);
     }
@@ -197,6 +173,27 @@ export default function Home() {
 
   return (
     <>
+      <div className="frame pointer-events-none">
+        <img
+          id="image"
+          alt=""
+          className="absolute top-0 left-0 opacity-100 layer layer-masked"
+          src={photoData.src}
+        />
+
+        {photoDepthMap.map((depth, i) => (
+          <img
+            key={i}
+            id={`image-${i}`}
+            alt=""
+            className="absolute top-0 left-0 opacity-100 layer layer-masked"
+            src={photoData.src}
+            style={{
+              maskImage: `url(${depth})`,
+            }}
+          />
+        ))}
+      </div>
       <div className="flex gap-1 p-2">
         <Select
           value={String(photo)}
@@ -291,31 +288,8 @@ export default function Home() {
         </a>
         .
       </div>
-      <div className="frame">
-        <img
-          id="image"
-          alt=""
-          className="absolute top-0 left-0 opacity-100 layer layer-masked"
-          src={photoData.src}
-        />
-
-        {photoDepthMap.map((depth, i) => (
-          <img
-            key={i}
-            id={`image-${i}`}
-            alt=""
-            className="absolute top-0 left-0 opacity-100 layer layer-masked"
-            // src={depth}
-            src={photoData.src}
-            style={{
-              maskImage: `url(${depth})`,
-            }}
-          />
-        ))}
-      </div>
 
       <div
-        // shoiw onl;y on desktop
         className="flex-col align-center hidden md:flex"
         style={{
           position: "fixed",
@@ -330,18 +304,6 @@ export default function Home() {
           backgroundColor: "#ecf0f1",
         }}
       >
-        {/* <img
-            alt=""
-            className="layer layer-masked"
-            style={{
-              display: "inline-block",
-              width: 80 * 2,
-              height: 100 * 2,
-              margin: 4,
-            }}
-            src={photoData.depthSrc}
-          /> */}
-
         {photoDepthMap.map((layer, i) => (
           <img
             key={i}
@@ -391,5 +353,10 @@ const photos = {
   ginza: {
     src: "/3d/ginza.jpg",
     depthSrc: "/3d/ginza-depth.png",
+  },
+
+  castle: {
+    src: "/3d/castle.jpg",
+    depthSrc: "/3d/castle-depth.png",
   },
 } as const;
