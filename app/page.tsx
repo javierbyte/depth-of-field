@@ -19,10 +19,10 @@ const CSS_PERSPECTIVE = 1000;
 const SPRING_TENSION = 0.8;
 const WEAK_SPRING_TENSION = 0.96;
 
-const DEFAULT_SEPARATION: number = 12;
+const DEFAULT_SEPARATION: number = 8;
 
 const SLICES = 12;
-const SLICE_SPREAD = 1;
+const SLICE_SPREAD = 0.5;
 
 const BLUR_OPTION = {
   "No Blur": undefined,
