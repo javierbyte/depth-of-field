@@ -15,8 +15,6 @@ export async function depthSlicer(
   layers: [number, number][],
   brightnessTransform?: (value: number) => number
 ): Promise<string[]> {
-  console.info(">>SLICING", path, JSON.stringify(layers));
-
   const img = new Image();
   img.src = path;
   await img.decode();

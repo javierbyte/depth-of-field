@@ -14,15 +14,15 @@ import {
 
 import { depthSlicer } from "./lib/slice";
 
-const CSS_PERSPECTIVE = 1080;
+const CSS_PERSPECTIVE = 1000;
 
 const SPRING_TENSION = 0.8;
-const WEAK_SPRING_TENSION = 0.95;
+const WEAK_SPRING_TENSION = 0.96;
 
 const DEFAULT_SEPARATION: number = 12;
 
 const SLICES = 12;
-const SLICE_SPREAD = 0.5;
+const SLICE_SPREAD = 1;
 
 const BLUR_OPTION = {
   "No Blur": undefined,
@@ -32,7 +32,7 @@ const BLUR_OPTION = {
 
 export default function Home() {
   const dataRef = useRef({
-    layerSeparation: 0,
+    targetLayerSeparation: 0,
     renderLayerSeparation: 0,
     blur: "No Blur",
     forceRender: false,
@@ -47,25 +47,31 @@ export default function Home() {
   const [isReady, setIsReady] = useState<null | string>(null);
 
   useEffect(() => {
+    setPhotoDepthMap([]);
+
+    setLayerSeparationUI(0);
+    dataRef.current.targetLayerSeparation = 0;
+    dataRef.current.renderLayerSeparation = 0;
+
+    const maxValue = 90;
+
     async function updateDepthLayers(depthSrc: string) {
       const sliceArr: [number, number][] = new Array(SLICES)
         .fill(0)
         .map((_, i) => {
-          const progress = ((i + 0.5) / SLICES) * 100;
+          const progress = ((i + 0.5) / SLICES) * maxValue;
           const sliceDiff = (100 / SLICES) * SLICE_SPREAD;
-          // return [(0 + progress * 2) / 3, (100 + progress * 2) / 3];
           return [
             Math.max(progress - sliceDiff),
             Math.min(progress + sliceDiff, 100),
           ];
-          // return [progress, progress];
         });
 
       const newDepthMap = await depthSlicer(depthSrc, sliceArr);
 
-      if (dataRef.current.layerSeparation === 0) {
+      if (dataRef.current.targetLayerSeparation === 0) {
         setLayerSeparationUI(DEFAULT_SEPARATION);
-        dataRef.current.layerSeparation = DEFAULT_SEPARATION;
+        dataRef.current.targetLayerSeparation = DEFAULT_SEPARATION;
         dataRef.current.renderLayerSeparation = 0;
       }
       setPhotoDepthMap(newDepthMap);
@@ -123,7 +129,11 @@ export default function Home() {
         Math.abs(data.targetX - data.renderX) +
         Math.abs(data.targetY - data.renderY);
 
-      if (totalDiff < 0.0001 && !data.forceRender) {
+      const layerDiff = Math.abs(
+        data.targetLayerSeparation - data.renderLayerSeparation
+      );
+
+      if (totalDiff < 0.001 && layerDiff < 1 && !data.forceRender) {
         data.forceRender = false;
         window.requestAnimationFrame(updateStyles);
         return;
@@ -136,7 +146,7 @@ export default function Home() {
 
       data.renderLayerSeparation =
         data.renderLayerSeparation * WEAK_SPRING_TENSION +
-        data.layerSeparation * (1 - WEAK_SPRING_TENSION);
+        data.targetLayerSeparation * (1 - WEAK_SPRING_TENSION);
 
       const x = data.renderX * 0.618;
       const y = data.renderY * 0.618;
@@ -169,6 +179,14 @@ export default function Home() {
     });
 
     updateStyles();
+
+    return () => {
+      window.removeEventListener("mousemove", onCursorMove);
+      window.removeEventListener("touchmove", (e) => {
+        // @ts-ignore
+        onCursorMove(e.touches[0]);
+      });
+    };
   }, [isReady]);
 
   return (
@@ -222,7 +240,7 @@ export default function Home() {
         <Select
           value={String(layerSeparationUI)}
           onValueChange={(e) => {
-            dataRef.current.layerSeparation = Number(e);
+            dataRef.current.targetLayerSeparation = Number(e);
             dataRef.current.forceRender = true;
             setLayerSeparationUI(Number(e));
           }}
@@ -252,7 +270,7 @@ export default function Home() {
           onValueChange={(e) => {
             dataRef.current.blur = e;
             dataRef.current.forceRender = true;
-            dataRef.current.layerSeparation = 0;
+            dataRef.current.targetLayerSeparation = 0;
             setLayerSeparationUI(0);
 
             setBlurUI(e);
@@ -326,37 +344,37 @@ export default function Home() {
 
 const photos = {
   tokyo: {
-    src: "/3d/tokyo.jpg",
-    depthSrc: "/3d/tokyo-depth.png",
+    src: "/3d/tokyo_400.jpg",
+    depthSrc: "/3d/tokyo-depth_400.jpg",
   },
 
   mallorca: {
-    src: "/3d/mallorca.jpg",
-    depthSrc: "/3d/mallorca-depth.png",
+    src: "/3d/mallorca_400.jpg",
+    depthSrc: "/3d/mallorca-depth_400.jpg",
   },
 
   angel: {
-    src: "/3d/angel.jpg",
-    depthSrc: "/3d/angel-depth.png",
+    src: "/3d/angel_400.jpg",
+    depthSrc: "/3d/angel-depth_400.jpg",
   },
 
   ml: {
-    src: "/3d/ml.jpg",
-    depthSrc: "/3d/ml-depth.png",
+    src: "/3d/ml_400.jpg",
+    depthSrc: "/3d/ml-depth_400.jpg",
   },
 
   osaka: {
-    src: "/3d/osaka.jpg",
-    depthSrc: "/3d/osaka-depth.png",
+    src: "/3d/osaka_400.jpg",
+    depthSrc: "/3d/osaka-depth_400.jpg",
   },
 
   ginza: {
-    src: "/3d/ginza.jpg",
-    depthSrc: "/3d/ginza-depth.png",
+    src: "/3d/ginza_400.jpg",
+    depthSrc: "/3d/ginza-depth_400.jpg",
   },
 
   castle: {
-    src: "/3d/castle.jpg",
-    depthSrc: "/3d/castle-depth.png",
+    src: "/3d/castle_400.jpg",
+    depthSrc: "/3d/castle-depth_400.jpg",
   },
 } as const;
