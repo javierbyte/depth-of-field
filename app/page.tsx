@@ -23,8 +23,8 @@ const DEFAULT_SEPARATION: number = 12;
 
 const BLUR_OPTION = {
   "No Blur": undefined,
-  "Back focus": [0, 0.5, 1, 2, 3, 4],
-  "Close focus": [4, 3, 2, 1, 0.5, 0],
+  "Back focus": [0, 0, 1, 2, 3, 4],
+  "Close focus": [4, 3, 2, 1, 0, 0],
 } as const;
 
 export default function Home() {
@@ -45,18 +45,22 @@ export default function Home() {
 
   useEffect(() => {
     async function updateDepthLayers(depthSrc: string) {
-      const overlap = 5; // important
+      const overlap = 5;
       const slices = 5;
       const availableSolidRange = 100 - overlap * (slices - 1);
       const solidRange = availableSolidRange / slices; // important
 
-      const newDepthMap = await depthSlicer(depthSrc, [
-        [0, solidRange + overlap],
-        [solidRange, solidRange * 2 + overlap * 2],
-        [solidRange * 2 + overlap, solidRange * 3 + overlap * 3],
-        [solidRange * 3 + overlap * 2, solidRange * 4 + overlap * 4],
-        [solidRange * 4 + overlap * 3, solidRange * 5 + overlap * 4],
-      ]);
+      const newDepthMap = await depthSlicer(
+        depthSrc,
+        [
+          [0, solidRange + overlap],
+          [solidRange, solidRange * 2 + overlap * 2],
+          [solidRange * 2 + overlap, solidRange * 3 + overlap * 3],
+          [solidRange * 3 + overlap * 2, solidRange * 4 + overlap * 4],
+          [solidRange * 4 + overlap * 3, solidRange * 5 + overlap * 4],
+        ],
+        (b) => b * 1.25
+      );
       setPhotoDepthMap(newDepthMap);
       setIsReady(depthSrc);
     }

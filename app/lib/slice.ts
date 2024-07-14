@@ -12,32 +12,27 @@ const HEIGHT = 500;
 
 export async function depthSlicer(
   path: string,
-  layers: [number, number][]
+  layers: [number, number][],
+  brightnessTransform?: (value: number) => number
 ): Promise<string[]> {
-  console.info(">>SLICING", path, layers);
-
-  // path is the URL of a depth map, load it into an image and then a canvas
+  console.info(">>SLICING", path, JSON.stringify(layers));
 
   const img = new Image();
   img.src = path;
   await img.decode();
   const canvas = document.createElement("canvas");
-  // canvas.width = img.width;
-  // canvas.height = img.height;
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
+
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     throw new Error("Could not get canvas context");
   }
-  // ctx.drawImage(img, 0, 0);
   ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
 
   // get the pixel data from the canvas
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
-
-  // transform the image from black-white to black visible to black 0% visible
 
   const layerUrls: string[] = [];
 
@@ -45,7 +40,12 @@ export async function depthSlicer(
     const newImageData = ctx.createImageData(canvas.width, canvas.height);
 
     for (let i = 0; i < data.length; i += 4) {
-      const value = (data[i] / 255) * 100;
+      let value = (data[i] / 255) * 100;
+
+      if (brightnessTransform) {
+        value = brightnessTransform(value);
+      }
+
       if (value < layer[0]) {
         newImageData.data[i] = 0;
         newImageData.data[i + 1] = 0;
@@ -61,7 +61,7 @@ export async function depthSlicer(
         newImageData.data[i] = 0;
         newImageData.data[i + 1] = 0;
         newImageData.data[i + 2] = 0;
-        newImageData.data[i + 3] = percentage * 255;
+        newImageData.data[i + 3] = Math.round(percentage * 255);
       }
     }
 
@@ -73,23 +73,4 @@ export async function depthSlicer(
   }
 
   return layerUrls;
-
-  // const newImageData = ctx.createImageData(canvas.width, canvas.height);
-
-  // for (let i = 0; i < data.length; i += 4) {
-
-  //   newImageData.data[i] = 0;
-  //   newImageData.data[i + 1] = 0;
-  //   newImageData.data[i + 2] = 0;
-  //   // newImageData.data[i + 3] = 255 - data[i];
-
-  // }
-
-  // ctx.putImageData(newImageData, 0, 0);
-
-  // const url = canvas.toDataURL();
-
-  // // console.log(url);
-
-  // return [url, url, url, url, url];
 }
