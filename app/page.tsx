@@ -232,8 +232,8 @@ export default function Home() {
           value={String(photo)}
           onValueChange={(e) => {
             // bug in safari with the blur not updating
-            dataRef.current.targetX += 0.05;
-            dataRef.current.targetY += 0.05;
+            dataRef.current.targetX = dataRef.current.targetX / 2;
+            dataRef.current.targetY = dataRef.current.targetY / 2;
             dataRef.current.forceRender = true;
             setPhoto(e as keyof typeof photos);
           }}
