@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { photos } from "./lib/data";
 
 import {
   Select,
@@ -14,7 +15,7 @@ import {
 
 import { depthSlicer } from "./lib/slice";
 
-const CSS_PERSPECTIVE = 1200;
+const CSS_PERSPECTIVE = 980;
 
 const SPRING_TENSION = 0.85;
 const WEAK_SPRING_TENSION = 0.95;
@@ -24,9 +25,12 @@ const DEFAULT_SLICES = 13;
 const DEFAULT_SPREAD = 0.1;
 const SPREAD_OPTIONS = [0, 0.05, 0.1, 0.2, 0.4, 0.7, 1];
 
-const DEFAULT_VOLUME = 128 + 128 / 2;
+const VOLUME_SCALE = new Array(9).fill(0).map((_, i) => {
+  return Math.round(32 + 32 * Math.pow(1.4, i));
+});
+const DEFAULT_VOLUME = VOLUME_SCALE[4];
 
-const DEFAULT_PHOTO = "Ginza";
+const DEFAULT_PHOTO = "Siegessäule";
 
 const LOCK_CURSOR_TIME = 64;
 const SNAP_TIME = 500;
@@ -67,7 +71,7 @@ export default function Home() {
     set("renderLayerSeparation", 0);
     set("focusing", Date.now());
 
-    const depthMapClamp = 85;
+    const depthMapClamp = 82;
     async function updateDepthLayers(depthSrc: string) {
       const data = dataRef.current;
       console.log("SLICING!", ui.slices, data.slices);
@@ -109,10 +113,6 @@ export default function Home() {
       data.targetX =
         ((e.clientX - centerX) / (innerWidth + innerHeight)) * scaleX;
       data.targetY = (e.clientY - centerY) / (innerWidth + innerHeight);
-
-      document.title = `${Math.round(data.targetX * 1000) / 1000} ${
-        Math.round(data.targetY * 1000) / 1000
-      }`;
     }
     function onCursorMoveTouch(e: TouchEvent) {
       // @ts-ignore
@@ -300,7 +300,7 @@ export default function Home() {
                 Volume
               </SelectItem>
 
-              {[0, 64, 128, 192, 320, 512].map((separation) => (
+              {VOLUME_SCALE.map((separation) => (
                 <SelectItem
                   key={separation}
                   onFocus={() => {
@@ -413,68 +413,3 @@ export default function Home() {
     </>
   );
 }
-
-const photos = {
-  "Tokyo Tower": {
-    src: "/3d/tokyo_400.jpg",
-    depthSrc: "/3d/tokyo-depth_400.jpg",
-    focus: {
-      x: 0.001,
-      y: 0.017,
-    },
-  },
-
-  Mallorca: {
-    src: "/3d/mallorca_400.jpg",
-    depthSrc: "/3d/mallorca-depth_400.jpg",
-    focus: {
-      x: -0.002,
-      y: -0.011,
-    },
-  },
-
-  Siegessäule: {
-    src: "/3d/angel_400.jpg",
-    depthSrc: "/3d/angel-depth_400.jpg",
-    focus: {
-      x: -0.002,
-      y: 0.087,
-    },
-  },
-
-  ML: {
-    src: "/3d/ml_400.jpg",
-    depthSrc: "/3d/ml-depth_400.jpg",
-    focus: {
-      x: -0.024,
-      y: 0.057,
-    },
-  },
-
-  Dotonbori: {
-    src: "/3d/osaka_400.jpg",
-    depthSrc: "/3d/osaka-depth_400.jpg",
-    focus: {
-      x: 0.003,
-      y: -0.012,
-    },
-  },
-
-  Ginza: {
-    src: "/3d/ginza_400.jpg",
-    depthSrc: "/3d/ginza-depth_400.jpg",
-    focus: {
-      x: 0.003,
-      y: -0.045,
-    },
-  },
-
-  "Osaka Castle": {
-    src: "/3d/castle_400.jpg",
-    depthSrc: "/3d/castle-depth_400.jpg",
-    focus: {
-      x: -0.075,
-      y: 0.054,
-    },
-  },
-} as const;

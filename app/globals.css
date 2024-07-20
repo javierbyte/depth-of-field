@@ -105,7 +105,7 @@ body {
 }
 
 .layer {
-  transform: perspective(1200px) rotateX(0deg) rotateY(0deg);
+  transform: perspective(980px) rotateX(0deg) rotateY(0deg);
   will-change: transform;
 }
 
