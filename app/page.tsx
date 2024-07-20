@@ -46,7 +46,6 @@ export default function Home() {
     volume: DEFAULT_VOLUME,
     spread: DEFAULT_SPREAD,
   });
-  const [isReady, setIsReady] = useState<null | string>(null);
 
   function set(
     path: "slices" | "volume" | "renderLayerSeparation",
@@ -81,8 +80,6 @@ export default function Home() {
       const newDepthMap = await depthSlicer(depthSrc, sliceArr);
 
       setPhotoDepthMap(newDepthMap);
-      setIsReady(depthSrc);
-
       set("volume", ui.volume);
     }
     updateDepthLayers(photos[photo].depthSrc);
@@ -91,33 +88,19 @@ export default function Home() {
   const photoData = photos[photo];
 
   useEffect(() => {
-    const imgContainer = document.querySelector<HTMLElement>("#depth");
-
-    if (!imgContainer) {
-      return;
-    }
-
     function onCursorMove(e: MouseEvent) {
       const data = dataRef.current;
 
-      if (e.clientY < 64 && e.clientX < 150) {
-        data.targetX = 0;
-        data.targetY = 0;
-        return;
-      }
-
       const { innerWidth, innerHeight } = window;
 
-      const { width, height, left, top } =
-        imgContainer!.getBoundingClientRect();
-      const imgCenterX = left + width / 2;
-      const imgCenterY = top + height / 2;
+      const centerX = innerWidth / 2;
+      const centerY = innerHeight / 2;
 
       const scaleX = innerHeight > innerWidth ? 1.25 : 1;
 
       data.targetX =
-        ((e.clientX - imgCenterX) / (innerWidth + innerHeight)) * scaleX;
-      data.targetY = (e.clientY - imgCenterY) / (innerWidth + innerHeight);
+        ((e.clientX - centerX) / (innerWidth + innerHeight)) * scaleX;
+      data.targetY = (e.clientY - centerY) / (innerWidth + innerHeight);
     }
     function onCursorMoveTouch(e: TouchEvent) {
       // @ts-ignore
@@ -131,7 +114,7 @@ export default function Home() {
       window.removeEventListener("mousemove", onCursorMove);
       window.removeEventListener("touchmove", onCursorMoveTouch);
     };
-  }, [isReady]);
+  }, []);
 
   useEffect(() => {
     const imgContainer = document.querySelector<HTMLElement>("#depth");
@@ -405,7 +388,7 @@ const photos = {
     depthSrc: "/3d/angel-depth_400.jpg",
   },
 
-  ml: {
+  ML: {
     src: "/3d/ml_400.jpg",
     depthSrc: "/3d/ml-depth_400.jpg",
   },
