@@ -14,7 +14,7 @@ import {
 
 import { depthSlicer } from "./lib/slice";
 
-const CSS_PERSPECTIVE = 1000;
+const CSS_PERSPECTIVE = 1200;
 
 const SPRING_TENSION = 0.85;
 const WEAK_SPRING_TENSION = 0.95;
@@ -109,6 +109,10 @@ export default function Home() {
       data.targetX =
         ((e.clientX - centerX) / (innerWidth + innerHeight)) * scaleX;
       data.targetY = (e.clientY - centerY) / (innerWidth + innerHeight);
+
+      document.title = `${Math.round(data.targetX * 1000) / 1000} ${
+        Math.round(data.targetY * 1000) / 1000
+      }`;
     }
     function onCursorMoveTouch(e: TouchEvent) {
       // @ts-ignore
@@ -234,7 +238,7 @@ export default function Home() {
         <img
           id="image"
           alt=""
-          className="absolute top-0 left-0 opacity-100 layer layer-masked"
+          className="absolute top-0 left-0 layer"
           src={photoData.src}
         />
 
@@ -243,7 +247,7 @@ export default function Home() {
             key={i}
             id={`image-${i}`}
             alt=""
-            className="absolute top-0 left-0 opacity-100 layer layer-masked"
+            className="absolute top-0 left-0 layer layer-masked"
             src={photoData.src}
             style={{
               maskImage: `url(${depth})`,
@@ -415,8 +419,8 @@ const photos = {
     src: "/3d/tokyo_400.jpg",
     depthSrc: "/3d/tokyo-depth_400.jpg",
     focus: {
-      x: 0.009,
-      y: -0.009,
+      x: 0.001,
+      y: 0.017,
     },
   },
 
@@ -424,8 +428,8 @@ const photos = {
     src: "/3d/mallorca_400.jpg",
     depthSrc: "/3d/mallorca-depth_400.jpg",
     focus: {
-      x: 0.031,
-      y: -0.046,
+      x: -0.002,
+      y: -0.011,
     },
   },
 
@@ -433,8 +437,8 @@ const photos = {
     src: "/3d/angel_400.jpg",
     depthSrc: "/3d/angel-depth_400.jpg",
     focus: {
-      x: -0.008,
-      y: 0.122,
+      x: -0.002,
+      y: 0.087,
     },
   },
 
@@ -442,8 +446,8 @@ const photos = {
     src: "/3d/ml_400.jpg",
     depthSrc: "/3d/ml-depth_400.jpg",
     focus: {
-      x: 0.003,
-      y: 0.076,
+      x: -0.024,
+      y: 0.057,
     },
   },
 
@@ -451,8 +455,8 @@ const photos = {
     src: "/3d/osaka_400.jpg",
     depthSrc: "/3d/osaka-depth_400.jpg",
     focus: {
-      x: -0.011,
-      y: -0.01,
+      x: 0.003,
+      y: -0.012,
     },
   },
 
@@ -460,8 +464,8 @@ const photos = {
     src: "/3d/ginza_400.jpg",
     depthSrc: "/3d/ginza-depth_400.jpg",
     focus: {
-      x: 0.019,
-      y: -0.055,
+      x: 0.003,
+      y: -0.045,
     },
   },
 
