@@ -16,8 +16,8 @@ import { depthSlicer } from "./lib/slice";
 
 const CSS_PERSPECTIVE = 1000;
 
-const SPRING_TENSION = 0.9;
-const WEAK_SPRING_TENSION = 0.97;
+const SPRING_TENSION = 0.85;
+const WEAK_SPRING_TENSION = 0.95;
 
 const DEFAULT_SLICES = 13;
 
