@@ -170,7 +170,9 @@ export default function Home() {
       const yDeg = Math.round(-y * 180 * 100) / 100;
 
       const offset = data.renderLayerSeparation;
-      const baseOffset = data.renderLayerSeparation * data.slices * -0.5;
+      const baseOffset = Math.round(
+        data.renderLayerSeparation * data.slices * -0.33
+      );
 
       imgLayerBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${baseOffset}px)`;
 
