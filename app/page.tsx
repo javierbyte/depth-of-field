@@ -16,7 +16,7 @@ import { depthSlicer } from "./lib/slice";
 
 const CSS_PERSPECTIVE = 1000;
 
-const SPRING_TENSION = 0.8;
+const SPRING_TENSION = 0.96;
 const WEAK_SPRING_TENSION = 0.96;
 
 const DEFAULT_SLICES = 13;
@@ -26,8 +26,13 @@ const SPREAD_OPTIONS = [0, 0.05, 0.1, 0.2, 0.4, 0.7, 1];
 
 const DEFAULT_VOLUME = 128 + 128 / 2;
 
+const DEFAULT_PHOTO = "Ginza";
+
+const SNAP_TIME = 300;
+
 export default function Home() {
   const dataRef = useRef({
+    photo: DEFAULT_PHOTO,
     slices: DEFAULT_SLICES,
     volume: 0,
     renderLayerSeparation: 0,
@@ -36,10 +41,9 @@ export default function Home() {
     targetY: 0,
     renderX: 0,
     renderY: 0,
+    focusing: Date.now() + SNAP_TIME,
   });
-  const [photo, setPhoto] = useState<keyof typeof photos>(
-    Object.keys(photos)[0] as any
-  );
+  const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
   const [ui, setUI] = useState({
     slices: DEFAULT_SLICES,
@@ -48,16 +52,19 @@ export default function Home() {
   });
 
   function set(
-    path: "slices" | "volume" | "renderLayerSeparation",
-    value: number
+    path: "slices" | "volume" | "renderLayerSeparation" | "photo" | "focusing",
+    value: any
   ) {
+    // @ts-ignore
     dataRef.current[path] = value;
     dataRef.current.forceRender = true;
   }
 
   useEffect(() => {
+    set("photo", photo);
     set("volume", 0);
     set("renderLayerSeparation", 0);
+    set("focusing", Date.now() + SNAP_TIME);
 
     const depthMapClamp = 85;
     async function updateDepthLayers(depthSrc: string) {
@@ -81,6 +88,11 @@ export default function Home() {
 
       setPhotoDepthMap(newDepthMap);
       set("volume", ui.volume);
+
+      if (data.targetX === 0 && data.targetY === 0) {
+        data.targetX = 0.019;
+        data.targetY = -0.055;
+      }
     }
     updateDepthLayers(photos[photo].depthSrc);
   }, [photo, ui.slices, ui.spread]);
@@ -138,26 +150,47 @@ export default function Home() {
         return;
       }
 
-      const totalDiff =
-        Math.abs(data.targetX - data.renderX) +
-        Math.abs(data.targetY - data.renderY);
-
       const targetLayerSeparation = data.volume / data.slices;
 
-      const layerDiff = Math.abs(
+      let targetX = data.targetX;
+      let targetY = data.targetY;
+
+      // @ts-ignore
+      const targetFocus = photos[data.photo].focus;
+      if (data.focusing && targetFocus) {
+        const now = Date.now();
+        if (now > data.focusing) {
+          data.focusing = 0;
+        }
+
+        data.targetX = targetFocus.x;
+        data.targetY = targetFocus.y;
+
+        targetX = targetFocus.x;
+        targetY = targetFocus.y;
+      }
+
+      const checkTotalDiff =
+        Math.abs(targetX - data.renderX) + Math.abs(targetY - data.renderY);
+      const checkLayerDiff = Math.abs(
         targetLayerSeparation - data.renderLayerSeparation
       );
-
-      if (totalDiff < 0.01 && layerDiff < 0.1 && !data.forceRender) {
+      if (
+        checkTotalDiff < 0.001 &&
+        checkLayerDiff < 0.1 &&
+        !data.forceRender &&
+        !data.focusing
+      ) {
         data.forceRender = false;
         window.requestAnimationFrame(updateStyles);
         return;
       }
+      data.forceRender = false;
 
       data.renderX =
-        data.renderX * SPRING_TENSION + data.targetX * (1 - SPRING_TENSION);
+        data.renderX * SPRING_TENSION + targetX * (1 - SPRING_TENSION);
       data.renderY =
-        data.renderY * SPRING_TENSION + data.targetY * (1 - SPRING_TENSION);
+        data.renderY * SPRING_TENSION + targetY * (1 - SPRING_TENSION);
 
       data.renderLayerSeparation =
         data.renderLayerSeparation * WEAK_SPRING_TENSION +
@@ -378,35 +411,63 @@ const photos = {
   "Tokyo Tower": {
     src: "/3d/tokyo_400.jpg",
     depthSrc: "/3d/tokyo-depth_400.jpg",
+    focus: {
+      x: 0.009,
+      y: -0.009,
+    },
   },
 
   Mallorca: {
     src: "/3d/mallorca_400.jpg",
     depthSrc: "/3d/mallorca-depth_400.jpg",
+    focus: {
+      x: 0.031,
+      y: -0.046,
+    },
   },
 
   Siegessäule: {
     src: "/3d/angel_400.jpg",
     depthSrc: "/3d/angel-depth_400.jpg",
+    focus: {
+      x: -0.008,
+      y: 0.122,
+    },
   },
 
   ML: {
     src: "/3d/ml_400.jpg",
     depthSrc: "/3d/ml-depth_400.jpg",
+    focus: {
+      x: 0.003,
+      y: 0.076,
+    },
   },
 
   Dotonbori: {
     src: "/3d/osaka_400.jpg",
     depthSrc: "/3d/osaka-depth_400.jpg",
+    focus: {
+      x: -0.011,
+      y: -0.01,
+    },
   },
 
   Ginza: {
     src: "/3d/ginza_400.jpg",
     depthSrc: "/3d/ginza-depth_400.jpg",
+    focus: {
+      x: 0.019,
+      y: -0.055,
+    },
   },
 
   "Osaka Castle": {
     src: "/3d/castle_400.jpg",
     depthSrc: "/3d/castle-depth_400.jpg",
+    focus: {
+      x: -0.075,
+      y: 0.054,
+    },
   },
 } as const;
