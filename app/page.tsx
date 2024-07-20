@@ -19,48 +19,59 @@ const CSS_PERSPECTIVE = 1000;
 const SPRING_TENSION = 0.8;
 const WEAK_SPRING_TENSION = 0.96;
 
-const DEFAULT_SEPARATION: number = 8;
+const DEFAULT_SLICES = 13;
 
-const SLICES = 12;
-const SLICE_SPREAD = 0.5;
+const DEFAULT_SPREAD = 0.1;
+const SPREAD_OPTIONS = [0, 0.05, 0.1, 0.2, 0.4, 0.7, 1];
 
-const BLUR_OPTION = {
-  "No Blur": undefined,
-  "Back focus": [0, 0, 1, 2, 3, 4],
-  "Close focus": [4, 3, 2, 1, 0, 0],
-} as const;
+const DEFAULT_VOLUME = 128 + 128 / 2;
 
 export default function Home() {
   const dataRef = useRef({
-    targetLayerSeparation: 0,
+    slices: DEFAULT_SLICES,
+    volume: 0,
     renderLayerSeparation: 0,
-    blur: "No Blur",
     forceRender: false,
     targetX: 0,
     targetY: 0,
     renderX: 0,
     renderY: 0,
   });
-  const [photo, setPhoto] = useState<keyof typeof photos>("tokyo");
+  const [photo, setPhoto] = useState<keyof typeof photos>(
+    Object.keys(photos)[0] as any
+  );
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
-
+  const [ui, setUI] = useState({
+    slices: DEFAULT_SLICES,
+    volume: DEFAULT_VOLUME,
+    spread: DEFAULT_SPREAD,
+  });
   const [isReady, setIsReady] = useState<null | string>(null);
 
+  function set(
+    path: "slices" | "volume" | "renderLayerSeparation",
+    value: number
+  ) {
+    dataRef.current[path] = value;
+    dataRef.current.forceRender = true;
+  }
+
   useEffect(() => {
-    setPhotoDepthMap([]);
+    set("volume", 0);
+    set("renderLayerSeparation", 0);
 
-    setLayerSeparationUI(0);
-    dataRef.current.targetLayerSeparation = 0;
-    dataRef.current.renderLayerSeparation = 0;
-
-    const maxValue = 90;
-
+    const depthMapClamp = 85;
     async function updateDepthLayers(depthSrc: string) {
-      const sliceArr: [number, number][] = new Array(SLICES)
+      const data = dataRef.current;
+      console.log("SLICING!", ui.slices, data.slices);
+
+      const spread = ui.spread * data.slices;
+
+      const sliceArr: [number, number][] = new Array(data.slices)
         .fill(0)
         .map((_, i) => {
-          const progress = ((i + 0.5) / SLICES) * maxValue;
-          const sliceDiff = (100 / SLICES) * SLICE_SPREAD;
+          const progress = ((i + 0.5) / data.slices) * depthMapClamp;
+          const sliceDiff = (100 / data.slices) * spread;
           return [
             Math.max(progress - sliceDiff),
             Math.min(progress + sliceDiff, 100),
@@ -69,37 +80,36 @@ export default function Home() {
 
       const newDepthMap = await depthSlicer(depthSrc, sliceArr);
 
-      if (dataRef.current.targetLayerSeparation === 0) {
-        setLayerSeparationUI(DEFAULT_SEPARATION);
-        dataRef.current.targetLayerSeparation = DEFAULT_SEPARATION;
-        dataRef.current.renderLayerSeparation = 0;
-      }
       setPhotoDepthMap(newDepthMap);
       setIsReady(depthSrc);
+
+      set("volume", ui.volume);
     }
     updateDepthLayers(photos[photo].depthSrc);
-  }, [photo]);
-
-  const [layerSeparationUI, setLayerSeparationUI] =
-    useState(DEFAULT_SEPARATION);
-
-  const [blurUI, setBlurUI] = useState("No Blur");
+  }, [photo, ui.slices, ui.spread]);
 
   const photoData = photos[photo];
 
   useEffect(() => {
-    const imgContainer = document.querySelector<HTMLElement>(".frame");
+    const imgContainer = document.querySelector<HTMLElement>("#depth");
 
     if (!imgContainer) {
       return;
     }
 
-    const onCursorMove = (e: MouseEvent) => {
+    function onCursorMove(e: MouseEvent) {
       const data = dataRef.current;
+
+      if (e.clientY < 64 && e.clientX < 150) {
+        data.targetX = 0;
+        data.targetY = 0;
+        return;
+      }
 
       const { innerWidth, innerHeight } = window;
 
-      const { width, height, left, top } = imgContainer.getBoundingClientRect();
+      const { width, height, left, top } =
+        imgContainer!.getBoundingClientRect();
       const imgCenterX = left + width / 2;
       const imgCenterY = top + height / 2;
 
@@ -108,7 +118,27 @@ export default function Home() {
       data.targetX =
         ((e.clientX - imgCenterX) / (innerWidth + innerHeight)) * scaleX;
       data.targetY = (e.clientY - imgCenterY) / (innerWidth + innerHeight);
+    }
+    function onCursorMoveTouch(e: TouchEvent) {
+      // @ts-ignore
+      onCursorMove(e.touches[0]);
+    }
+
+    window.addEventListener("mousemove", onCursorMove);
+    window.addEventListener("touchmove", onCursorMoveTouch);
+
+    return () => {
+      window.removeEventListener("mousemove", onCursorMove);
+      window.removeEventListener("touchmove", onCursorMoveTouch);
     };
+  }, [isReady]);
+
+  useEffect(() => {
+    const imgContainer = document.querySelector<HTMLElement>("#depth");
+
+    if (!imgContainer) {
+      return;
+    }
 
     function updateStyles() {
       const data = dataRef.current;
@@ -129,11 +159,13 @@ export default function Home() {
         Math.abs(data.targetX - data.renderX) +
         Math.abs(data.targetY - data.renderY);
 
+      const targetLayerSeparation = data.volume / data.slices;
+
       const layerDiff = Math.abs(
-        data.targetLayerSeparation - data.renderLayerSeparation
+        targetLayerSeparation - data.renderLayerSeparation
       );
 
-      if (totalDiff < 0.001 && layerDiff < 1 && !data.forceRender) {
+      if (totalDiff < 0.01 && layerDiff < 0.1 && !data.forceRender) {
         data.forceRender = false;
         window.requestAnimationFrame(updateStyles);
         return;
@@ -146,7 +178,7 @@ export default function Home() {
 
       data.renderLayerSeparation =
         data.renderLayerSeparation * WEAK_SPRING_TENSION +
-        data.targetLayerSeparation * (1 - WEAK_SPRING_TENSION);
+        targetLayerSeparation * (1 - WEAK_SPRING_TENSION);
 
       const x = data.renderX * 0.618;
       const y = data.renderY * 0.618;
@@ -155,43 +187,26 @@ export default function Home() {
       const yDeg = Math.round(-y * 180 * 100) / 100;
 
       const offset = data.renderLayerSeparation;
-      const baseOffset = -2;
+      const baseOffset = data.renderLayerSeparation * data.slices * -0.5;
 
-      imgLayerBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-        offset * baseOffset
-      }px)`;
+      imgLayerBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${baseOffset}px)`;
 
       for (let i = 0; i < imgLayers.length; i++) {
         // hack - first layer looks better if it is closer than the others
         const imgLayer = imgLayers[i];
         imgLayer.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-          offset * (baseOffset + i + 0.5)
+          offset * (i + 0.5) + baseOffset
         }px)`;
       }
 
       window.requestAnimationFrame(updateStyles);
     }
-
-    window.addEventListener("mousemove", onCursorMove);
-    window.addEventListener("touchmove", (e) => {
-      // @ts-ignore
-      onCursorMove(e.touches[0]);
-    });
-
     updateStyles();
-
-    return () => {
-      window.removeEventListener("mousemove", onCursorMove);
-      window.removeEventListener("touchmove", (e) => {
-        // @ts-ignore
-        onCursorMove(e.touches[0]);
-      });
-    };
-  }, [isReady]);
+  }, []);
 
   return (
     <>
-      <div className="frame pointer-events-none">
+      <div id="depth" className="frame pointer-events-none">
         <img
           id="image"
           alt=""
@@ -223,11 +238,14 @@ export default function Home() {
             setPhoto(e as keyof typeof photos);
           }}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[130px]">
             <SelectValue placeholder="Change photo" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
+              <SelectItem disabled value="Select Photo" className="w-[150px]">
+                Select Photo
+              </SelectItem>
               {Object.keys(photos).map((key) => (
                 <SelectItem key={key} value={key}>
                   {key}
@@ -238,52 +256,81 @@ export default function Home() {
         </Select>
 
         <Select
-          value={String(layerSeparationUI)}
+          value={String(ui.volume)}
           onValueChange={(e) => {
-            dataRef.current.targetLayerSeparation = Number(e);
-            dataRef.current.forceRender = true;
-            setLayerSeparationUI(Number(e));
+            set("volume", Number(e));
+            setUI((ui) => ({ ...ui, volume: Number(e) }));
           }}
         >
-          <SelectTrigger className="w-[72px]">
-            <SelectValue placeholder="Layer Separation" />
+          <SelectTrigger className="w-[82px]">
+            <SelectValue placeholder="Volume" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent
+            onBlur={() => {
+              set("volume", ui.volume);
+            }}
+          >
             <SelectGroup>
-              {/* title */}
-              <SelectItem disabled value="Layer Separation">
-                Layer Separation
+              <SelectItem disabled value="Volume">
+                Volume
               </SelectItem>
-              <SelectItem value="0">0px</SelectItem>
-              <SelectItem value="4">4px</SelectItem>
-              <SelectItem value="8">8px</SelectItem>
-              <SelectItem value="12">12px</SelectItem>
-              <SelectItem value="16">16px</SelectItem>
-              <SelectItem value="32">32px</SelectItem>
-              <SelectItem value="64">64px</SelectItem>
+
+              {[0, 64, 128, 192, 320, 512].map((separation) => (
+                <SelectItem
+                  key={separation}
+                  onFocus={() => {
+                    set("volume", separation);
+                  }}
+                  value={String(separation)}
+                >
+                  {separation}px
+                </SelectItem>
+              ))}
             </SelectGroup>
           </SelectContent>
         </Select>
 
         <Select
-          value={String(blurUI)}
+          value={String(ui.slices)}
           onValueChange={(e) => {
-            dataRef.current.blur = e;
-            dataRef.current.forceRender = true;
-            dataRef.current.targetLayerSeparation = 0;
-            setLayerSeparationUI(0);
-
-            setBlurUI(e);
+            set("slices", Number(e));
+            setUI((ui) => ({ ...ui, slices: Number(e) }));
           }}
         >
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="Blur" />
+          <SelectTrigger className="w-[60px]">
+            <SelectValue placeholder="Layer Separation" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              {Object.keys(BLUR_OPTION).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {key}
+              <SelectItem disabled value="Slices">
+                Slices
+              </SelectItem>
+              {[2, 3, 5, 8, 13, 21, 34].map((slices) => (
+                <SelectItem key={slices} value={String(slices)}>
+                  {slices}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={String(ui.spread)}
+          onValueChange={(e) => {
+            setUI((ui) => ({ ...ui, spread: Number(e) }));
+          }}
+        >
+          <SelectTrigger className="w-[82px]">
+            <SelectValue placeholder="Layer Spread" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem disabled value="Layer Spread">
+                Layer Spread
+              </SelectItem>
+              {SPREAD_OPTIONS.map((spread) => (
+                <SelectItem key={spread} value={String(spread)}>
+                  {spread * 100}%
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -343,17 +390,17 @@ export default function Home() {
 }
 
 const photos = {
-  tokyo: {
+  "Tokyo Tower": {
     src: "/3d/tokyo_400.jpg",
     depthSrc: "/3d/tokyo-depth_400.jpg",
   },
 
-  mallorca: {
+  Mallorca: {
     src: "/3d/mallorca_400.jpg",
     depthSrc: "/3d/mallorca-depth_400.jpg",
   },
 
-  angel: {
+  Siegessäule: {
     src: "/3d/angel_400.jpg",
     depthSrc: "/3d/angel-depth_400.jpg",
   },
@@ -363,17 +410,17 @@ const photos = {
     depthSrc: "/3d/ml-depth_400.jpg",
   },
 
-  osaka: {
+  Dotonbori: {
     src: "/3d/osaka_400.jpg",
     depthSrc: "/3d/osaka-depth_400.jpg",
   },
 
-  ginza: {
+  Ginza: {
     src: "/3d/ginza_400.jpg",
     depthSrc: "/3d/ginza-depth_400.jpg",
   },
 
-  castle: {
+  "Osaka Castle": {
     src: "/3d/castle_400.jpg",
     depthSrc: "/3d/castle-depth_400.jpg",
   },

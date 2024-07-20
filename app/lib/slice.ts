@@ -12,8 +12,7 @@ const HEIGHT = 500;
 
 export async function depthSlicer(
   path: string,
-  layers: [number, number][],
-  brightnessTransform?: (value: number) => number
+  layers: [number, number][]
 ): Promise<string[]> {
   const img = new Image();
   img.src = path;
@@ -29,45 +28,34 @@ export async function depthSlicer(
   ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
 
   // get the pixel data from the canvas
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
   const layerUrls: string[] = [];
 
-  for (const layer of layers) {
+  const scaledLayers = layers.map(([start, end]) => [
+    Math.round((start / 100) * 255),
+    Math.round((end / 100) * 255),
+  ]);
+
+  for (const layer of scaledLayers) {
     const newImageData = ctx.createImageData(canvas.width, canvas.height);
 
     for (let i = 0; i < data.length; i += 4) {
-      let value = (data[i] / 255) * 100;
-
-      if (brightnessTransform) {
-        value = brightnessTransform(value);
-      }
+      const value = data[i];
 
       if (value < layer[0]) {
-        newImageData.data[i] = 0;
-        newImageData.data[i + 1] = 0;
-        newImageData.data[i + 2] = 0;
         newImageData.data[i + 3] = 0;
       } else if (value > layer[1]) {
-        newImageData.data[i] = 0;
-        newImageData.data[i + 1] = 0;
-        newImageData.data[i + 2] = 0;
         newImageData.data[i + 3] = 255;
       } else {
         const percentage = (value - layer[0]) / (layer[1] - layer[0]);
-        newImageData.data[i] = 0;
-        newImageData.data[i + 1] = 0;
-        newImageData.data[i + 2] = 0;
         newImageData.data[i + 3] = Math.round(percentage * 255);
       }
     }
 
     ctx.putImageData(newImageData, 0, 0);
 
-    const url = canvas.toDataURL();
-
-    layerUrls.push(url);
+    layerUrls.push(canvas.toDataURL());
   }
 
   return layerUrls;
