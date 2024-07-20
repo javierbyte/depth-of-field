@@ -18,7 +18,7 @@ import { depthSlicer } from "./lib/slice";
 const CSS_PERSPECTIVE = 980;
 
 const SPRING_TENSION = 0.85;
-const WEAK_SPRING_TENSION = 0.95;
+const WEAK_SPRING_TENSION = 0.94;
 
 const DEFAULT_SLICES = 13;
 
@@ -29,7 +29,6 @@ const VOLUME_SCALE = new Array(9).fill(0).map((_, i) => {
   return Math.round(32 + 32 * Math.pow(1.4, i));
 });
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
-
 const DEFAULT_PHOTO = "Siegessäule";
 
 const LOCK_CURSOR_TIME = 64;
