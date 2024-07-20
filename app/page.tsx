@@ -17,16 +17,17 @@ import { depthSlicer } from "./lib/slice";
 
 const CSS_PERSPECTIVE = 980;
 
-const SPRING_TENSION = 0.85;
+const SPRING_TENSION = 0.82;
 const WEAK_SPRING_TENSION = 0.94;
 
-const DEFAULT_SLICES = 13;
+const SLICES_OPTIONS = [2, 3, 5, 8, 13, 21, 34];
+const DEFAULT_SLICES = 8;
 
 const SPREAD_OPTIONS = [0, 0.05, 0.1, 0.2, 0.4, 0.7, 1];
 const DEFAULT_SPREAD = 0.05;
 
 const VOLUME_SCALE = new Array(9).fill(0).map((_, i) => {
-  return Math.round(32 * Math.pow(1.4, i));
+  return Math.round(128 * Math.pow(1.2, i) - 128);
 });
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
 const DEFAULT_PHOTO = "Siegessäule";
@@ -329,7 +330,7 @@ export default function Home() {
               <SelectItem disabled value="Slices">
                 Slices
               </SelectItem>
-              {[2, 3, 5, 8, 13, 21, 34].map((slices) => (
+              {SLICES_OPTIONS.map((slices) => (
                 <SelectItem key={slices} value={String(slices)}>
                   {slices}
                 </SelectItem>
@@ -379,35 +380,30 @@ export default function Home() {
       </div>
 
       <div
-        className="flex-col align-center hidden md:flex"
+        className="hidden lg:block fixed h-dvh"
         style={{
-          position: "fixed",
-          height: "100vh",
           overflowY: "auto",
           overflowX: "hidden",
-          gap: 4,
           top: 0,
           right: 0,
-          width: 80 * 2 + 16,
-          padding: "16px 8px 32px",
           backgroundColor: "#ecf0f1",
         }}
       >
-        {photoDepthMap.map((layer, i) => (
-          <img
-            key={i}
-            id={`image-${i}`}
-            alt=""
-            className="layer layer-masked"
-            style={{
-              backgroundColor: "#808080",
-              display: "inline-block",
-              width: 80 * 2,
-              height: 100 * 2,
-            }}
-            src={layer}
-          />
-        ))}
+        <div className="flex flex-col gap-2 p-2 rounded-3xl bg-gray-300 m-2">
+          {photoDepthMap.map((layer, i) => (
+            <img
+              key={i}
+              id={`image-${i}`}
+              alt=""
+              className="rounded-2xl bg-gray-400 block"
+              style={{
+                width: 80 * 2,
+                height: 100 * 2,
+              }}
+              src={layer}
+            />
+          ))}
+        </div>
       </div>
     </>
   );
