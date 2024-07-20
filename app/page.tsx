@@ -16,8 +16,8 @@ import { depthSlicer } from "./lib/slice";
 
 const CSS_PERSPECTIVE = 1000;
 
-const SPRING_TENSION = 0.96;
-const WEAK_SPRING_TENSION = 0.96;
+const SPRING_TENSION = 0.9;
+const WEAK_SPRING_TENSION = 0.97;
 
 const DEFAULT_SLICES = 13;
 
@@ -28,7 +28,8 @@ const DEFAULT_VOLUME = 128 + 128 / 2;
 
 const DEFAULT_PHOTO = "Ginza";
 
-const SNAP_TIME = 300;
+const LOCK_CURSOR_TIME = 64;
+const SNAP_TIME = 500;
 
 export default function Home() {
   const dataRef = useRef({
@@ -41,7 +42,7 @@ export default function Home() {
     targetY: 0,
     renderX: 0,
     renderY: 0,
-    focusing: Date.now() + SNAP_TIME,
+    focusing: Date.now(),
   });
   const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
@@ -64,7 +65,7 @@ export default function Home() {
     set("photo", photo);
     set("volume", 0);
     set("renderLayerSeparation", 0);
-    set("focusing", Date.now() + SNAP_TIME);
+    set("focusing", Date.now());
 
     const depthMapClamp = 85;
     async function updateDepthLayers(depthSrc: string) {
@@ -88,11 +89,6 @@ export default function Home() {
 
       setPhotoDepthMap(newDepthMap);
       set("volume", ui.volume);
-
-      if (data.targetX === 0 && data.targetY === 0) {
-        data.targetX = 0.019;
-        data.targetY = -0.055;
-      }
     }
     updateDepthLayers(photos[photo].depthSrc);
   }, [photo, ui.slices, ui.spread]);
@@ -159,15 +155,21 @@ export default function Home() {
       const targetFocus = photos[data.photo].focus;
       if (data.focusing && targetFocus) {
         const now = Date.now();
-        if (now > data.focusing) {
+
+        if (now > data.focusing + SNAP_TIME) {
           data.focusing = 0;
+        } else {
+          if (now < data.focusing + LOCK_CURSOR_TIME) {
+            targetX = data.renderX;
+            targetY = data.renderY;
+          } else {
+            targetX = (targetFocus.x * window.innerWidth) / 1512;
+            targetY = (targetFocus.y * window.innerHeight) / 857;
+          }
+
+          data.targetX = targetX;
+          data.targetY = targetY;
         }
-
-        data.targetX = targetFocus.x;
-        data.targetY = targetFocus.y;
-
-        targetX = targetFocus.x;
-        targetY = targetFocus.y;
       }
 
       const checkTotalDiff =
@@ -187,10 +189,14 @@ export default function Home() {
       }
       data.forceRender = false;
 
+      const movementTension = data.focusing
+        ? WEAK_SPRING_TENSION
+        : SPRING_TENSION;
+
       data.renderX =
-        data.renderX * SPRING_TENSION + targetX * (1 - SPRING_TENSION);
+        data.renderX * movementTension + targetX * (1 - movementTension);
       data.renderY =
-        data.renderY * SPRING_TENSION + targetY * (1 - SPRING_TENSION);
+        data.renderY * movementTension + targetY * (1 - movementTension);
 
       data.renderLayerSeparation =
         data.renderLayerSeparation * WEAK_SPRING_TENSION +
@@ -249,9 +255,6 @@ export default function Home() {
         <Select
           value={String(photo)}
           onValueChange={(e) => {
-            // bug in safari with the blur not updating
-            dataRef.current.targetX = dataRef.current.targetX / 2;
-            dataRef.current.targetY = dataRef.current.targetY / 2;
             dataRef.current.forceRender = true;
             setPhoto(e as keyof typeof photos);
           }}

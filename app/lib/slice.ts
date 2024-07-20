@@ -55,7 +55,9 @@ export async function depthSlicer(
 
     ctx.putImageData(newImageData, 0, 0);
 
-    layerUrls.push(canvas.toDataURL());
+    const dataUrl = canvas.toDataURL();
+
+    layerUrls.push(dataUrl);
   }
 
   return layerUrls;
