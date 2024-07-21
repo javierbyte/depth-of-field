@@ -1,12 +1,15 @@
-[![depth-of-field-proof-of-concept](app/opengraph-image.jpg)](https://depth-of-field.vercel.app/)
+Monorepo of experiments.
 
-This is a proof of concept. Most of the code is in the [`/app/page.tsx`](https://github.com/javierbyte/depth-of-field/blob/main/app/page.tsx) page. Inspired by [Frosted Glass](https://frosted-glass.shud.in/) by [Shuding](https://twitter.com/shuding_).
+### Depth of field
 
-## Getting Started
+[![depth-of-field-proof-of-concept](apps/depth-of-field/app/opengraph-image.jpg)](https://depth-of-field.vercel.app/)
 
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+- [Code](https://github.com/javierbyte/depth-of-field/tree/main/apps/depth-of-field)
+- Inspired by [Frosted Glass](https://frosted-glass.shud.in/) by [Shuding](https://twitter.com/shuding_).
 
-```bash
-pnpm i
-pnpm dev
-```
+### Depth mask
+
+[![depth-mask-proof-of-concept](apps/depth-mask/app/opengraph-image.jpg)](https://depth-mask.vercel.app/)
+
+- [Code](https://github.com/javierbyte/depth-of-field/tree/main/apps/depth-mask)
+- Inpired by [this tweet](https://x.com/raunofreiberg/status/1787887279454683324) by [Rauno](https://x.com/raunofreiberg/) and building upon the Depth of field experiment and my previous experiment on [layers and pointclouds with CSS](https://javier.xyz/blog/css-pointcloud-experiment).
