@@ -81,15 +81,14 @@ body {
   --height: 500px;
 }
 
-@media (max-width: 420px) {
+@media (max-height: 600px) {
   :root {
-    --width: calc(400px * 0.7);
-    --height: calc(500px * 0.7);
+    --width: calc(400px * 0.8);
+    --height: calc(500px * 0.8);
   }
 }
 
-/* if screen 1200 or more */
-@media (min-width: 1200px) {
+@media (min-width: 1200px) and (min-height: 600px) {
   :root {
     --width: calc(400px * 1.15);
     --height: calc(500px * 1.15);
@@ -97,7 +96,7 @@ body {
 }
 
 .layer {
-  transform: perspective(980px) rotateX(0deg) rotateY(0deg);
+  transform: perspective(980px) rotateX(0deg) rotateY(0deg) translateZ(0px);
   will-change: transform;
   border-radius: 16px;
 }

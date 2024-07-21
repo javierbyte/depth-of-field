@@ -26,8 +26,8 @@ const DEFAULT_SLICES = 8;
 const SPREAD_OPTIONS = [0, 0.05, 0.1, 0.2, 0.4, 0.7, 1];
 const DEFAULT_SPREAD = 0.05;
 
-const VOLUME_SCALE = new Array(9).fill(0).map((_, i) => {
-  return Math.round(128 * Math.pow(1.2, i) - 128);
+const VOLUME_SCALE = new Array(10).fill(0).map((_, i) => {
+  return Math.round(128 * Math.pow(1.22, i) - 128);
 });
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
 const DEFAULT_PHOTO = "Museumsinsel";
