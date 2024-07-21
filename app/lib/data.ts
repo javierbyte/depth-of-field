@@ -26,14 +26,14 @@ export const photos = {
     },
   },
 
-  ML: {
-    src: "/3d/ml_400.jpg",
-    depthSrc: "/3d/ml-depth_400.jpg",
-    focus: {
-      x: -0.024,
-      y: 0.057,
-    },
-  },
+  // ML: {
+  //   src: "/3d/ml_400.jpg",
+  //   depthSrc: "/3d/ml-depth_400.jpg",
+  //   focus: {
+  //     x: -0.024,
+  //     y: 0.057,
+  //   },
+  // },
 
   Dotonbori: {
     src: "/3d/osaka_400.jpg",

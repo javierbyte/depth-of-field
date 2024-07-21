@@ -32,8 +32,8 @@ const VOLUME_SCALE = new Array(9).fill(0).map((_, i) => {
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
 const DEFAULT_PHOTO = "Siegessäule";
 
-const LOCK_CURSOR_TIME = 64;
-const SNAP_TIME = 500;
+const LOCK_CURSOR_TIME = 128;
+const SNAP_TIME = 650;
 
 export default function Home() {
   const dataRef = useRef({
@@ -182,7 +182,7 @@ export default function Home() {
         targetLayerSeparation - data.renderLayerSeparation
       );
       if (
-        checkTotalDiff < 0.001 &&
+        checkTotalDiff < 0.01 &&
         checkLayerDiff < 0.1 &&
         !data.forceRender &&
         !data.focusing
@@ -362,49 +362,65 @@ export default function Home() {
           </SelectContent>
         </Select>
       </div>
-      <div className="fixed bottom-4 left-4 text-sm">
-        Depth of field with layered masks proof of concept.
-        <br />
-        {"Made by "}
-        <a className="underline" href="https://twitter.com/javierbyte">
-          @javierbyte
-        </a>
-        {". Source "}
-        <a
-          className="underline"
-          href="https://github.com/javierbyte/depth-of-field"
-        >
-          Github
-        </a>
-        .
-      </div>
-
-      <div
-        className="hidden lg:block fixed h-dvh"
-        style={{
-          overflowY: "auto",
-          overflowX: "hidden",
-          top: 0,
-          right: 0,
-          backgroundColor: "#ecf0f1",
-        }}
-      >
-        <div className="flex flex-col gap-2 p-2 rounded-3xl bg-gray-300 m-2">
-          {photoDepthMap.map((layer, i) => (
-            <img
-              key={i}
-              id={`image-${i}`}
-              alt=""
-              className="rounded-2xl bg-gray-400 block"
-              style={{
-                width: 80 * 2,
-                height: 100 * 2,
-              }}
-              src={layer}
-            />
-          ))}
-        </div>
-      </div>
+      <SidebarLayer layers={photoDepthMap} />
+      <Footer />
     </>
+  );
+}
+
+function SidebarLayer({ layers }: { layers: string[] }) {
+  return (
+    <div
+      className="hidden lg:block fixed h-dvh"
+      style={{
+        overflowY: "auto",
+        overflowX: "hidden",
+        top: 0,
+        right: 0,
+      }}
+    >
+      <div className="flex flex-col gap-2 p-2 rounded-3xl m-2 bg-gray-200">
+        {layers.map((layer, i) => (
+          <img
+            key={i}
+            id={`image-${i}`}
+            alt=""
+            className="rounded-2xl block bg-gray-400"
+            style={{
+              backgroundImage: `url("/checkers.svg")`,
+              backgroundRepeat: `repeat`,
+              width: 80 * 2,
+              height: 100 * 2,
+            }}
+            src={layer}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Footer() {
+  return (
+    <div className="fixed bottom-4 left-4 text-sm">
+      Depth map rendered with CSSS masks proof of concept.
+      <br />
+      {"By "}
+      <a className="underline" href="https://twitter.com/javierbyte">
+        @javierbyte
+      </a>
+      {". Depth map by "}
+      <a className="underline" href="https://depth-anything-v2.github.io/">
+        Depth Anything
+      </a>
+      {". "}
+      <a
+        className="underline"
+        href="https://github.com/javierbyte/depth-of-field"
+      >
+        Source
+      </a>
+      {"."}
+    </div>
   );
 }
