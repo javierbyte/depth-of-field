@@ -30,7 +30,7 @@ const VOLUME_SCALE = new Array(9).fill(0).map((_, i) => {
   return Math.round(128 * Math.pow(1.2, i) - 128);
 });
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
-const DEFAULT_PHOTO = "Siegessäule";
+const DEFAULT_PHOTO = "Museumsinsel";
 
 const LOCK_CURSOR_TIME = 128;
 const SNAP_TIME = 650;
@@ -263,7 +263,7 @@ export default function Home() {
             setPhoto(e as keyof typeof photos);
           }}
         >
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="w-[135px]">
             <SelectValue placeholder="Change photo" />
           </SelectTrigger>
           <SelectContent>

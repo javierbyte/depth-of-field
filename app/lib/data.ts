@@ -26,14 +26,14 @@ export const photos = {
     },
   },
 
-  // ML: {
-  //   src: "/3d/ml_400.jpg",
-  //   depthSrc: "/3d/ml-depth_400.jpg",
-  //   focus: {
-  //     x: -0.024,
-  //     y: 0.057,
-  //   },
-  // },
+  Museumsinsel: {
+    src: "/3d/isla_400.jpg",
+    depthSrc: "/3d/isla-depth_400.jpg",
+    focus: {
+      x: 0.035,
+      y: 0.015,
+    },
+  },
 
   Dotonbori: {
     src: "/3d/osaka_400.jpg",
