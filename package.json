@@ -4,15 +4,17 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:mask": "turbo dev --filter=depth-mask",
+    "dev:depth": "turbo dev --filter=depth-of-field",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
-    "prettier": "^3.2.5",
-    "turbo": "^2.0.9",
-    "typescript": "^5.4.5"
+    "prettier": "^3.9.5",
+    "turbo": "^2.10.5",
+    "typescript": "^5.9.0"
   },
-  "packageManager": "pnpm@8.15.6",
+  "packageManager": "pnpm@11.11.0",
   "engines": {
     "node": ">=18"
   }

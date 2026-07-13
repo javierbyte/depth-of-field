@@ -1,2 +1,14 @@
 packages:
   - "apps/*"
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@turbo/darwin-64@2.10.5'
+  - '@turbo/darwin-arm64@2.10.5'
+  - '@turbo/linux-64@2.10.5'
+  - '@turbo/linux-arm64@2.10.5'
+  - '@turbo/windows-64@2.10.5'
+  - '@turbo/windows-arm64@2.10.5'
+  - postcss@8.5.19
+  - turbo@2.10.5

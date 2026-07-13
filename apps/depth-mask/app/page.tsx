@@ -46,7 +46,7 @@ export default function Home() {
     targetY: 0,
     renderX: 0,
     renderY: 0,
-    focusing: Date.now(),
+    focusing: 0,
   });
   const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
