@@ -7,12 +7,13 @@
     "dev:mask": "turbo dev --filter=depth-mask",
     "dev:depth": "turbo dev --filter=depth-of-field",
     "lint": "turbo lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "update:latest": "pnpm --recursive --include-workspace-root up --latest"
   },
   "devDependencies": {
-    "prettier": "^3.9.5",
-    "turbo": "^2.10.5",
-    "typescript": "^5.9.0"
+    "prettier": "^3.9.6",
+    "turbo": "^2.10.9",
+    "typescript": "^7.0.2"
   },
   "packageManager": "pnpm@11.11.0",
   "engines": {
