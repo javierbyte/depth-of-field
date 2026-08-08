@@ -10,13 +10,14 @@ if the value of a given pixel is between the two numbers, it is considered to be
 const WIDTH = 400;
 const HEIGHT = 500;
 
+export type DepthSource = {
+  src: string;
+};
+
 export async function depthSlicer(
-  path: string,
-  layers: [number, number][]
+  sources: readonly DepthSource[],
+  layers: [number, number][],
 ): Promise<string[]> {
-  const img = new Image();
-  img.src = path;
-  await img.decode();
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
@@ -25,10 +26,9 @@ export async function depthSlicer(
   if (!ctx) {
     throw new Error("Could not get canvas context");
   }
-  ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
 
-  // get the pixel data from the canvas
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const sourceValues = await Promise.all(sources.map(loadDepthValues));
+  const depthValues = averageDepthValues(sourceValues);
 
   const layerUrls: string[] = [];
 
@@ -40,16 +40,17 @@ export async function depthSlicer(
   for (const layer of scaledLayers) {
     const newImageData = ctx.createImageData(canvas.width, canvas.height);
 
-    for (let i = 0; i < data.length; i += 4) {
-      const value = data[i];
+    for (let i = 0; i < depthValues.length; i++) {
+      const value = depthValues[i];
+      const alphaIndex = i * 4 + 3;
 
       if (value < layer[0]) {
-        newImageData.data[i + 3] = 0;
+        newImageData.data[alphaIndex] = 0;
       } else if (value > layer[1]) {
-        newImageData.data[i + 3] = 255;
+        newImageData.data[alphaIndex] = 255;
       } else {
         const percentage = (value - layer[0]) / (layer[1] - layer[0]);
-        newImageData.data[i + 3] = Math.round(percentage * 255);
+        newImageData.data[alphaIndex] = Math.round(percentage * 255);
       }
     }
 
@@ -61,4 +62,41 @@ export async function depthSlicer(
   }
 
   return layerUrls;
+}
+
+async function loadDepthValues(source: DepthSource) {
+  const img = new Image();
+  img.src = source.src;
+  await img.decode();
+
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get canvas context");
+
+  ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
+  const pixels = ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
+  const values = new Uint8ClampedArray(WIDTH * HEIGHT);
+
+  for (let i = 0; i < values.length; i++) {
+    values[i] = pixels[i * 4];
+  }
+
+  return values;
+}
+
+function averageDepthValues(sources: Uint8ClampedArray[]) {
+  if (!sources.length) throw new Error("At least one depth source is required");
+
+  const averaged = new Uint8ClampedArray(sources[0].length);
+
+  for (let i = 0; i < averaged.length; i++) {
+    let total = 0;
+    for (const source of sources) total += source[i];
+    averaged[i] = Math.round(total / sources.length);
+  }
+
+  return averaged;
 }

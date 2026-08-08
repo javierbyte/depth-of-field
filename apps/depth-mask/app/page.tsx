@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { photos } from "./lib/data";
+import { depthModels, photos, type DepthModel } from "./lib/data";
 
 import {
   Select,
@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { depthSlicer } from "./lib/slice";
+import { depthSlicer, type DepthSource } from "./lib/slice";
 
 const CSS_PERSPECTIVE = 980;
 
@@ -31,6 +31,7 @@ const VOLUME_SCALE = new Array(10).fill(0).map((_, i) => {
 });
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
 const DEFAULT_PHOTO = "Museumsinsel";
+const DEFAULT_DEPTH_MODEL: DepthModel = "v2";
 
 const LOCK_CURSOR_TIME = 128;
 const SNAP_TIME = 650;
@@ -49,6 +50,7 @@ export default function Home() {
     focusing: 0,
   });
   const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
+  const [depthModel, setDepthModel] = useState<DepthModel>(DEFAULT_DEPTH_MODEL);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
   const [ui, setUI] = useState({
     slices: DEFAULT_SLICES,
@@ -58,7 +60,7 @@ export default function Home() {
 
   function set(
     path: "slices" | "volume" | "renderLayerSeparation" | "photo" | "focusing",
-    value: any
+    value: any,
   ) {
     // @ts-ignore
     dataRef.current[path] = value;
@@ -66,13 +68,16 @@ export default function Home() {
   }
 
   useEffect(() => {
+    let cancelled = false;
+
     set("photo", photo);
     set("volume", 0);
     set("renderLayerSeparation", 0);
     set("focusing", Date.now());
+    setPhotoDepthMap([]);
 
     const depthMapClamp = 82;
-    async function updateDepthLayers(depthSrc: string) {
+    async function updateDepthLayers(depthSources: readonly DepthSource[]) {
       const data = dataRef.current;
       console.log("SLICING!", ui.slices, data.slices);
 
@@ -89,13 +94,23 @@ export default function Home() {
           ];
         });
 
-      const newDepthMap = await depthSlicer(depthSrc, sliceArr);
+      const newDepthMap = await depthSlicer(depthSources, sliceArr);
 
+      if (cancelled) return;
       setPhotoDepthMap(newDepthMap);
       set("volume", ui.volume);
     }
-    updateDepthLayers(photos[photo].depthSrc);
-  }, [photo, ui.slices, ui.spread]);
+    const depthMaps = photos[photo].depthMaps;
+    const depthSources: readonly DepthSource[] =
+      depthModel === "combined"
+        ? [depthMaps.v2, depthMaps.v3Mono]
+        : [depthMaps[depthModel]];
+    updateDepthLayers(depthSources);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [depthModel, photo, ui.slices, ui.spread]);
 
   const photoData = photos[photo];
 
@@ -179,7 +194,7 @@ export default function Home() {
       const checkTotalDiff =
         Math.abs(targetX - data.renderX) + Math.abs(targetY - data.renderY);
       const checkLayerDiff = Math.abs(
-        targetLayerSeparation - data.renderLayerSeparation
+        targetLayerSeparation - data.renderLayerSeparation,
       );
       if (
         checkTotalDiff < 0.01 &&
@@ -214,7 +229,7 @@ export default function Home() {
 
       const offset = data.renderLayerSeparation;
       const baseOffset = Math.round(
-        data.renderLayerSeparation * data.slices * -0.33
+        data.renderLayerSeparation * data.slices * -0.33,
       );
 
       imgLayerBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${baseOffset}px)`;
@@ -255,7 +270,7 @@ export default function Home() {
           />
         ))}
       </div>
-      <div className="flex gap-1 p-2">
+      <div className="flex flex-wrap gap-1 p-2">
         <Select
           value={String(photo)}
           onValueChange={(e) => {
@@ -361,6 +376,27 @@ export default function Home() {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        <Select
+          value={depthModel}
+          onValueChange={(value) => setDepthModel(value as DepthModel)}
+        >
+          <SelectTrigger aria-label="Depth model" className="w-[190px]">
+            <SelectValue placeholder="Depth model" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem disabled value="Depth Model">
+                Depth Model
+              </SelectItem>
+              {(Object.keys(depthModels) as DepthModel[]).map((model) => (
+                <SelectItem key={model} value={model}>
+                  {depthModels[model]}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
       <SidebarLayer layers={photoDepthMap} />
       <Footer />
@@ -403,15 +439,22 @@ function SidebarLayer({ layers }: { layers: string[] }) {
 function Footer() {
   return (
     <div className="fixed bottom-4 left-4 text-sm">
-      Depth map rendered with CSSS masks proof of concept.
+      Depth map rendered with CSS masks proof of concept.
       <br />
       {"By "}
       <a className="underline" href="https://twitter.com/javierbyte">
         @javierbyte
       </a>
-      {". Depth map by "}
+      {". Depth maps by "}
       <a className="underline" href="https://depth-anything-v2.github.io/">
-        Depth Anything
+        Depth Anything V2
+      </a>
+      {" and "}
+      <a
+        className="underline"
+        href="https://replicate.com/vufinder/depth-anything-v3-mono"
+      >
+        Depth Anything V3 Mono
       </a>
       {". "}
       <a

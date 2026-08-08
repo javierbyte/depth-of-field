@@ -1,0 +1,30 @@
+{
+  "angel": {
+    "nearMeters": 1.55206298828125,
+    "farMeters": 17.71353734970093
+  },
+  "castle": {
+    "nearMeters": 1.1036264455318452,
+    "farMeters": 102.9743196105957
+  },
+  "ginza": {
+    "nearMeters": 2.690067343711853,
+    "farMeters": 65.7867056274414
+  },
+  "isla": {
+    "nearMeters": 5.707494645118714,
+    "farMeters": 115.35091400146484
+  },
+  "mallorca": {
+    "nearMeters": 2.9297327637672423,
+    "farMeters": 25.99362564086914
+  },
+  "osaka": {
+    "nearMeters": 5.965958571434021,
+    "farMeters": 113.7645403289795
+  },
+  "tokyo": {
+    "nearMeters": 2.9284071564674377,
+    "farMeters": 62.80882678985596
+  }
+}
