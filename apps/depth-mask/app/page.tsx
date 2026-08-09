@@ -21,7 +21,7 @@ import {
   unprojectPoint,
 } from "./lib/focus";
 
-const CSS_PERSPECTIVE = 980;
+const CSS_PERSPECTIVE = 1080;
 
 const SPRING_TENSION = 0.82;
 const WEAK_SPRING_TENSION = 0.94;
@@ -111,12 +111,18 @@ export default function Home() {
   });
   const depthRef = useRef<HTMLDivElement>(null);
   const baseImageRef = useRef<HTMLImageElement>(null);
+  const focusMarkerIdRef = useRef(0);
   const motionTrackingRef = useRef(false);
   const motionOriginRef = useRef<MotionOrigin | null>(null);
   const motionWindowRef = useRef<MotionWindow | null>(null);
   const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
   const [depthModel, setDepthModel] = useState<DepthModel>(DEFAULT_DEPTH_MODEL);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
+  const [focusMarker, setFocusMarker] = useState<{
+    id: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [motionTrackingAvailable, setMotionTrackingAvailable] = useState(false);
   const [motionTrackingStatus, setMotionTrackingStatus] =
     useState<MotionTrackingStatus>("idle");
@@ -148,6 +154,7 @@ export default function Home() {
     data.renderFocusViewY = 0;
     data.renderFocusAmount = 0;
     data.forceRender = true;
+    setFocusMarker(null);
   }
 
   function focusAt(clientX: number, clientY: number) {
@@ -197,6 +204,12 @@ export default function Home() {
     data.targetFocusViewY = data.renderY;
     data.focusing = 0;
     data.forceRender = true;
+    focusMarkerIdRef.current += 1;
+    setFocusMarker({
+      id: focusMarkerIdRef.current,
+      x: clientX,
+      y: clientY,
+    });
   }
 
   async function toggleMotionTracking() {
@@ -697,6 +710,18 @@ export default function Home() {
           />
         ))}
       </div>
+      {focusMarker && (
+        <span
+          key={focusMarker.id}
+          className="focus-marker"
+          style={{ left: focusMarker.x, top: focusMarker.y }}
+          onAnimationEnd={() => {
+            setFocusMarker((current) =>
+              current?.id === focusMarker.id ? null : current,
+            );
+          }}
+        />
+      )}
       <div className="flex flex-wrap gap-1 p-2">
         <Select
           value={String(photo)}
