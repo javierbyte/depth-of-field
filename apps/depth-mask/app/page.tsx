@@ -48,8 +48,8 @@ const LOCK_CURSOR_TIME = 128;
 const SNAP_TIME = 650;
 const MOTION_SENSITIVITY = 0.006;
 const MAX_MOTION_TARGET = 0.25;
-const MOTION_RECENTER_DELAY = 3000;
-const MOTION_SLOW_SPEED_THRESHOLD = 2;
+const MOTION_RECENTER_DELAY = 2500;
+const MOTION_STILL_RADIUS = 2.5;
 
 type MotionTrackingStatus =
   "idle" | "requesting" | "enabled" | "denied" | "unsupported" | "error";
@@ -63,11 +63,10 @@ type MotionOrigin = {
 };
 
 type MotionWindow = {
-  beta: number;
-  gamma: number;
+  anchorBeta: number;
+  anchorGamma: number;
   screenAngle: number;
   startedAt: number;
-  distance: number;
 };
 
 type DeviceOrientationEventWithPermission = typeof DeviceOrientationEvent & {
@@ -393,51 +392,52 @@ export default function Home() {
         };
         motionOriginRef.current = origin;
         motionWindowRef.current = {
-          beta: event.beta,
-          gamma: event.gamma,
+          anchorBeta: event.beta,
+          anchorGamma: event.gamma,
           screenAngle,
           startedAt: now,
-          distance: 0,
         };
         return;
       }
 
       if (!motionWindow || motionWindow.screenAngle !== screenAngle) {
         motionWindow = {
-          beta: event.beta,
-          gamma: event.gamma,
+          anchorBeta: event.beta,
+          anchorGamma: event.gamma,
           screenAngle,
           startedAt: now,
-          distance: 0,
         };
         motionWindowRef.current = motionWindow;
       } else {
-        const betaStep = shortestAngleDelta(event.beta, motionWindow.beta);
-        const gammaStep = shortestAngleDelta(event.gamma, motionWindow.gamma);
-        motionWindow.distance += Math.hypot(betaStep, gammaStep);
-        motionWindow.beta = event.beta;
-        motionWindow.gamma = event.gamma;
+        const betaFromAnchor = shortestAngleDelta(
+          event.beta,
+          motionWindow.anchorBeta,
+        );
+        const gammaFromAnchor = shortestAngleDelta(
+          event.gamma,
+          motionWindow.anchorGamma,
+        );
+        const movementFromAnchor = Math.hypot(betaFromAnchor, gammaFromAnchor);
 
-        const elapsed = now - motionWindow.startedAt;
-        if (elapsed >= MOTION_RECENTER_DELAY) {
-          const averageSpeed = motionWindow.distance / (elapsed / 1000);
-
-          if (averageSpeed <= MOTION_SLOW_SPEED_THRESHOLD) {
-            data.targetX = 0;
-            data.targetY = 0;
-            data.forceRender = true;
-            origin = {
-              beta: event.beta,
-              gamma: event.gamma,
-              screenAngle,
-              targetX: 0,
-              targetY: 0,
-            };
-            motionOriginRef.current = origin;
-          }
-
+        if (movementFromAnchor > MOTION_STILL_RADIUS) {
+          motionWindow.anchorBeta = event.beta;
+          motionWindow.anchorGamma = event.gamma;
           motionWindow.startedAt = now;
-          motionWindow.distance = 0;
+        } else if (now - motionWindow.startedAt >= MOTION_RECENTER_DELAY) {
+          data.targetX = 0;
+          data.targetY = 0;
+          data.forceRender = true;
+          origin = {
+            beta: event.beta,
+            gamma: event.gamma,
+            screenAngle,
+            targetX: 0,
+            targetY: 0,
+          };
+          motionOriginRef.current = origin;
+          motionWindow.anchorBeta = event.beta;
+          motionWindow.anchorGamma = event.gamma;
+          motionWindow.startedAt = now;
         }
       }
 
