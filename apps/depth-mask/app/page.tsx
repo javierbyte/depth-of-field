@@ -48,6 +48,8 @@ const LOCK_CURSOR_TIME = 128;
 const SNAP_TIME = 650;
 const MOTION_SENSITIVITY = 0.006;
 const MAX_MOTION_TARGET = 0.25;
+const MOTION_RECENTER_DELAY = 3000;
+const MOTION_SLOW_SPEED_THRESHOLD = 2;
 
 type MotionTrackingStatus =
   "idle" | "requesting" | "enabled" | "denied" | "unsupported" | "error";
@@ -58,6 +60,14 @@ type MotionOrigin = {
   screenAngle: number;
   targetX: number;
   targetY: number;
+};
+
+type MotionWindow = {
+  beta: number;
+  gamma: number;
+  screenAngle: number;
+  startedAt: number;
+  distance: number;
 };
 
 type DeviceOrientationEventWithPermission = typeof DeviceOrientationEvent & {
@@ -104,6 +114,7 @@ export default function Home() {
   const baseImageRef = useRef<HTMLImageElement>(null);
   const motionTrackingRef = useRef(false);
   const motionOriginRef = useRef<MotionOrigin | null>(null);
+  const motionWindowRef = useRef<MotionWindow | null>(null);
   const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
   const [depthModel, setDepthModel] = useState<DepthModel>(DEFAULT_DEPTH_MODEL);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
@@ -193,6 +204,7 @@ export default function Home() {
     if (motionTrackingRef.current) {
       motionTrackingRef.current = false;
       motionOriginRef.current = null;
+      motionWindowRef.current = null;
       setMotionTrackingStatus("idle");
       return;
     }
@@ -216,7 +228,14 @@ export default function Home() {
         return;
       }
 
+      const data = dataRef.current;
+      data.targetX = 0;
+      data.targetY = 0;
+      data.focusing = 0;
+      data.forceRender = true;
+
       motionOriginRef.current = null;
+      motionWindowRef.current = null;
       motionTrackingRef.current = true;
       setMotionTrackingStatus("enabled");
     } catch {
@@ -360,7 +379,9 @@ export default function Home() {
 
       const data = dataRef.current;
       const screenAngle = getScreenAngle();
+      const now = performance.now();
       let origin = motionOriginRef.current;
+      let motionWindow = motionWindowRef.current;
 
       if (!origin || origin.screenAngle !== screenAngle) {
         origin = {
@@ -371,7 +392,53 @@ export default function Home() {
           targetY: data.targetY,
         };
         motionOriginRef.current = origin;
+        motionWindowRef.current = {
+          beta: event.beta,
+          gamma: event.gamma,
+          screenAngle,
+          startedAt: now,
+          distance: 0,
+        };
         return;
+      }
+
+      if (!motionWindow || motionWindow.screenAngle !== screenAngle) {
+        motionWindow = {
+          beta: event.beta,
+          gamma: event.gamma,
+          screenAngle,
+          startedAt: now,
+          distance: 0,
+        };
+        motionWindowRef.current = motionWindow;
+      } else {
+        const betaStep = shortestAngleDelta(event.beta, motionWindow.beta);
+        const gammaStep = shortestAngleDelta(event.gamma, motionWindow.gamma);
+        motionWindow.distance += Math.hypot(betaStep, gammaStep);
+        motionWindow.beta = event.beta;
+        motionWindow.gamma = event.gamma;
+
+        const elapsed = now - motionWindow.startedAt;
+        if (elapsed >= MOTION_RECENTER_DELAY) {
+          const averageSpeed = motionWindow.distance / (elapsed / 1000);
+
+          if (averageSpeed <= MOTION_SLOW_SPEED_THRESHOLD) {
+            data.targetX = 0;
+            data.targetY = 0;
+            data.forceRender = true;
+            origin = {
+              beta: event.beta,
+              gamma: event.gamma,
+              screenAngle,
+              targetX: 0,
+              targetY: 0,
+            };
+            motionOriginRef.current = origin;
+          }
+
+          motionWindow.startedAt = now;
+          motionWindow.distance = 0;
+        }
       }
 
       const betaDelta = shortestAngleDelta(event.beta, origin.beta);
