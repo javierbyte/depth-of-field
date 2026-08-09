@@ -12,8 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 import { depthSlicer, type DepthSource } from "./lib/slice";
+import {
+  createPlaneProjection,
+  projectPoint,
+  unprojectPoint,
+} from "./lib/focus";
 
 const CSS_PERSPECTIVE = 980;
 
@@ -31,10 +37,45 @@ const VOLUME_SCALE = new Array(10).fill(0).map((_, i) => {
 });
 const DEFAULT_VOLUME = VOLUME_SCALE[4];
 const DEFAULT_PHOTO = "Museumsinsel";
-const DEFAULT_DEPTH_MODEL: DepthModel = "v2";
+const DEFAULT_DEPTH_MODEL: DepthModel = "combined";
+const DEPTH_MODEL_SHORT_LABELS: Record<DepthModel, string> = {
+  v2: "V2",
+  v3Mono: "V3",
+  combined: "V2 + V3",
+};
 
 const LOCK_CURSOR_TIME = 128;
 const SNAP_TIME = 650;
+const MOTION_SENSITIVITY = 0.006;
+const MAX_MOTION_TARGET = 0.25;
+
+type MotionTrackingStatus =
+  "idle" | "requesting" | "enabled" | "denied" | "unsupported" | "error";
+
+type MotionOrigin = {
+  beta: number;
+  gamma: number;
+  screenAngle: number;
+  targetX: number;
+  targetY: number;
+};
+
+type DeviceOrientationEventWithPermission = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<"granted" | "denied">;
+};
+
+function clampMotionTarget(value: number) {
+  return Math.max(-MAX_MOTION_TARGET, Math.min(MAX_MOTION_TARGET, value));
+}
+
+function shortestAngleDelta(angle: number, origin: number) {
+  return ((angle - origin + 540) % 360) - 180;
+}
+
+function getScreenAngle() {
+  const legacyWindow = window as Window & { orientation?: number };
+  return window.screen.orientation?.angle ?? legacyWindow.orientation ?? 0;
+}
 
 export default function Home() {
   const dataRef = useRef({
@@ -48,10 +89,27 @@ export default function Home() {
     renderX: 0,
     renderY: 0,
     focusing: 0,
+    focusActive: false,
+    targetFocusX: 0.5,
+    targetFocusY: 0.5,
+    renderFocusX: 0.5,
+    renderFocusY: 0.5,
+    targetFocusViewX: 0,
+    targetFocusViewY: 0,
+    renderFocusViewX: 0,
+    renderFocusViewY: 0,
+    renderFocusAmount: 0,
   });
+  const depthRef = useRef<HTMLDivElement>(null);
+  const baseImageRef = useRef<HTMLImageElement>(null);
+  const motionTrackingRef = useRef(false);
+  const motionOriginRef = useRef<MotionOrigin | null>(null);
   const [photo, setPhoto] = useState<keyof typeof photos>(DEFAULT_PHOTO);
   const [depthModel, setDepthModel] = useState<DepthModel>(DEFAULT_DEPTH_MODEL);
   const [photoDepthMap, setPhotoDepthMap] = useState<string[]>([]);
+  const [motionTrackingAvailable, setMotionTrackingAvailable] = useState(false);
+  const [motionTrackingStatus, setMotionTrackingStatus] =
+    useState<MotionTrackingStatus>("idle");
   const [ui, setUI] = useState({
     slices: DEFAULT_SLICES,
     volume: DEFAULT_VOLUME,
@@ -66,6 +124,136 @@ export default function Home() {
     dataRef.current[path] = value;
     dataRef.current.forceRender = true;
   }
+
+  function resetClickFocus() {
+    const data = dataRef.current;
+    data.focusActive = false;
+    data.targetFocusX = 0.5;
+    data.targetFocusY = 0.5;
+    data.renderFocusX = 0.5;
+    data.renderFocusY = 0.5;
+    data.targetFocusViewX = 0;
+    data.targetFocusViewY = 0;
+    data.renderFocusViewX = 0;
+    data.renderFocusViewY = 0;
+    data.renderFocusAmount = 0;
+    data.forceRender = true;
+  }
+
+  function focusAt(clientX: number, clientY: number) {
+    const imgContainer = depthRef.current;
+    const imgLayerBase = baseImageRef.current;
+
+    if (!imgContainer || !imgLayerBase) {
+      return;
+    }
+
+    const { width, height } = imgLayerBase.getBoundingClientRect();
+    const projection = createPlaneProjection(
+      window.getComputedStyle(imgLayerBase).transform,
+      imgLayerBase.offsetWidth,
+      imgLayerBase.offsetHeight,
+    );
+
+    if (!width || !height || !projection) {
+      return;
+    }
+
+    const containerRect = imgContainer.getBoundingClientRect();
+    const focusPoint = unprojectPoint(projection, {
+      x: clientX - containerRect.left,
+      y: clientY - containerRect.top,
+    });
+
+    if (
+      !focusPoint ||
+      focusPoint.x < 0 ||
+      focusPoint.x > imgLayerBase.offsetWidth ||
+      focusPoint.y < 0 ||
+      focusPoint.y > imgLayerBase.offsetHeight
+    ) {
+      return;
+    }
+
+    const data = dataRef.current;
+    if (!data.focusActive) {
+      data.renderFocusViewX = data.renderX;
+      data.renderFocusViewY = data.renderY;
+    }
+    data.focusActive = true;
+    data.targetFocusX = focusPoint.x / imgLayerBase.offsetWidth;
+    data.targetFocusY = focusPoint.y / imgLayerBase.offsetHeight;
+    data.targetFocusViewX = data.renderX;
+    data.targetFocusViewY = data.renderY;
+    data.focusing = 0;
+    data.forceRender = true;
+  }
+
+  async function toggleMotionTracking() {
+    if (motionTrackingRef.current) {
+      motionTrackingRef.current = false;
+      motionOriginRef.current = null;
+      setMotionTrackingStatus("idle");
+      return;
+    }
+
+    if (!("DeviceOrientationEvent" in window)) {
+      setMotionTrackingStatus("unsupported");
+      return;
+    }
+
+    setMotionTrackingStatus("requesting");
+
+    try {
+      const DeviceOrientation =
+        window.DeviceOrientationEvent as DeviceOrientationEventWithPermission;
+      const permission = DeviceOrientation.requestPermission
+        ? await DeviceOrientation.requestPermission()
+        : "granted";
+
+      if (permission !== "granted") {
+        setMotionTrackingStatus("denied");
+        return;
+      }
+
+      motionOriginRef.current = null;
+      motionTrackingRef.current = true;
+      setMotionTrackingStatus("enabled");
+    } catch {
+      setMotionTrackingStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    if (!("DeviceOrientationEvent" in window)) {
+      return;
+    }
+
+    const DeviceOrientation =
+      window.DeviceOrientationEvent as DeviceOrientationEventWithPermission;
+
+    // iOS only exposes motion data after a user-triggered permission request,
+    // so the permission API itself is the capability signal there.
+    if (DeviceOrientation.requestPermission) {
+      setMotionTrackingAvailable(true);
+      return;
+    }
+
+    function detectMotionData(event: DeviceOrientationEvent) {
+      if (event.beta === null || event.gamma === null) {
+        return;
+      }
+
+      setMotionTrackingAvailable(true);
+      window.removeEventListener("deviceorientation", detectMotionData, true);
+    }
+
+    window.addEventListener("deviceorientation", detectMotionData, true);
+
+    return () => {
+      window.removeEventListener("deviceorientation", detectMotionData, true);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +304,10 @@ export default function Home() {
 
   useEffect(() => {
     function onCursorMove(e: MouseEvent) {
+      if (motionTrackingRef.current) {
+        return;
+      }
+
       const data = dataRef.current;
 
       const { innerWidth, innerHeight } = window;
@@ -130,25 +322,103 @@ export default function Home() {
       data.targetY = (e.clientY - centerY) / (innerWidth + innerHeight);
     }
     function onCursorMoveTouch(e: TouchEvent) {
+      if (!e.touches[0]) {
+        return;
+      }
+
       // @ts-ignore
       onCursorMove(e.touches[0]);
+    }
+    function onResize() {
+      dataRef.current.forceRender = true;
     }
 
     window.addEventListener("mousemove", onCursorMove);
     window.addEventListener("touchmove", onCursorMoveTouch);
+    window.addEventListener("resize", onResize);
 
     return () => {
       window.removeEventListener("mousemove", onCursorMove);
       window.removeEventListener("touchmove", onCursorMoveTouch);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
   useEffect(() => {
-    const imgContainer = document.querySelector<HTMLElement>("#depth");
+    if (motionTrackingStatus !== "enabled") {
+      return;
+    }
+
+    function onDeviceOrientation(event: DeviceOrientationEvent) {
+      if (!motionTrackingRef.current) {
+        return;
+      }
+
+      if (event.beta === null || event.gamma === null) {
+        return;
+      }
+
+      const data = dataRef.current;
+      const screenAngle = getScreenAngle();
+      let origin = motionOriginRef.current;
+
+      if (!origin || origin.screenAngle !== screenAngle) {
+        origin = {
+          beta: event.beta,
+          gamma: event.gamma,
+          screenAngle,
+          targetX: data.targetX,
+          targetY: data.targetY,
+        };
+        motionOriginRef.current = origin;
+        return;
+      }
+
+      const betaDelta = shortestAngleDelta(event.beta, origin.beta);
+      const gammaDelta = shortestAngleDelta(event.gamma, origin.gamma);
+      const normalizedScreenAngle = ((screenAngle % 360) + 360) % 360;
+      let horizontalDelta = gammaDelta;
+      let verticalDelta = betaDelta;
+
+      if (normalizedScreenAngle === 90) {
+        horizontalDelta = betaDelta;
+        verticalDelta = -gammaDelta;
+      } else if (normalizedScreenAngle === 180) {
+        horizontalDelta = -gammaDelta;
+        verticalDelta = -betaDelta;
+      } else if (normalizedScreenAngle === 270) {
+        horizontalDelta = -betaDelta;
+        verticalDelta = gammaDelta;
+      }
+
+      data.targetX = clampMotionTarget(
+        origin.targetX + horizontalDelta * MOTION_SENSITIVITY,
+      );
+      data.targetY = clampMotionTarget(
+        origin.targetY + verticalDelta * MOTION_SENSITIVITY,
+      );
+      data.forceRender = true;
+    }
+
+    window.addEventListener("deviceorientation", onDeviceOrientation, true);
+
+    return () => {
+      window.removeEventListener(
+        "deviceorientation",
+        onDeviceOrientation,
+        true,
+      );
+    };
+  }, [motionTrackingStatus]);
+
+  useEffect(() => {
+    const imgContainer = depthRef.current;
 
     if (!imgContainer) {
       return;
     }
+
+    let animationFrame = 0;
 
     function updateStyles() {
       const data = dataRef.current;
@@ -196,14 +466,22 @@ export default function Home() {
       const checkLayerDiff = Math.abs(
         targetLayerSeparation - data.renderLayerSeparation,
       );
+      const checkFocusDiff = data.focusActive
+        ? Math.abs(data.targetFocusX - data.renderFocusX) +
+          Math.abs(data.targetFocusY - data.renderFocusY) +
+          Math.abs(data.targetFocusViewX - data.renderFocusViewX) +
+          Math.abs(data.targetFocusViewY - data.renderFocusViewY) +
+          Math.abs(1 - data.renderFocusAmount)
+        : data.renderFocusAmount;
       if (
         checkTotalDiff < 0.01 &&
         checkLayerDiff < 0.1 &&
+        checkFocusDiff < 0.0001 &&
         !data.forceRender &&
         !data.focusing
       ) {
         data.forceRender = false;
-        window.requestAnimationFrame(updateStyles);
+        animationFrame = window.requestAnimationFrame(updateStyles);
         return;
       }
       data.forceRender = false;
@@ -221,6 +499,39 @@ export default function Home() {
         data.renderLayerSeparation * WEAK_SPRING_TENSION +
         targetLayerSeparation * (1 - WEAK_SPRING_TENSION);
 
+      if (data.focusActive) {
+        data.renderFocusX =
+          data.renderFocusX * SPRING_TENSION +
+          data.targetFocusX * (1 - SPRING_TENSION);
+        data.renderFocusY =
+          data.renderFocusY * SPRING_TENSION +
+          data.targetFocusY * (1 - SPRING_TENSION);
+        data.renderFocusViewX =
+          data.renderFocusViewX * SPRING_TENSION +
+          data.targetFocusViewX * (1 - SPRING_TENSION);
+        data.renderFocusViewY =
+          data.renderFocusViewY * SPRING_TENSION +
+          data.targetFocusViewY * (1 - SPRING_TENSION);
+        data.renderFocusAmount =
+          data.renderFocusAmount * SPRING_TENSION + 1 - SPRING_TENSION;
+
+        if (Math.abs(data.targetFocusX - data.renderFocusX) < 0.00001) {
+          data.renderFocusX = data.targetFocusX;
+        }
+        if (Math.abs(data.targetFocusY - data.renderFocusY) < 0.00001) {
+          data.renderFocusY = data.targetFocusY;
+        }
+        if (Math.abs(data.targetFocusViewX - data.renderFocusViewX) < 0.00001) {
+          data.renderFocusViewX = data.targetFocusViewX;
+        }
+        if (Math.abs(data.targetFocusViewY - data.renderFocusViewY) < 0.00001) {
+          data.renderFocusViewY = data.targetFocusViewY;
+        }
+        if (Math.abs(1 - data.renderFocusAmount) < 0.00001) {
+          data.renderFocusAmount = 1;
+        }
+      }
+
       const x = data.renderX * 0.618;
       const y = data.renderY * 0.618;
 
@@ -232,29 +543,77 @@ export default function Home() {
         data.renderLayerSeparation * data.slices * -0.33,
       );
 
-      imgLayerBase.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${baseOffset}px)`;
+      const baseTransform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${baseOffset}px)`;
+      imgLayerBase.style.transform = baseTransform;
+
+      const imageWidth = imgLayerBase.offsetWidth;
+      const imageHeight = imgLayerBase.offsetHeight;
+      const focusPoint = {
+        x: data.renderFocusX * imageWidth,
+        y: data.renderFocusY * imageHeight,
+      };
+      const focusX = data.renderFocusViewX * 0.618;
+      const focusY = data.renderFocusViewY * 0.618;
+      const focusXDeg = Math.round(focusX * 180 * 100) / 100;
+      const focusYDeg = Math.round(-focusY * 180 * 100) / 100;
+      const focusBaseTransform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${focusYDeg}deg) rotateY(${focusXDeg}deg) translateZ(${baseOffset}px)`;
+      const baseProjection = data.focusActive
+        ? createPlaneProjection(focusBaseTransform, imageWidth, imageHeight)
+        : null;
+      const projectedFocus = baseProjection
+        ? projectPoint(baseProjection, focusPoint)
+        : null;
 
       for (let i = 0; i < imgLayers.length; i++) {
         // hack - first layer looks better if it is closer than the others
         const imgLayer = imgLayers[i];
-        imgLayer.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${
-          offset * (i + 0.5) + baseOffset
-        }px)`;
+        const layerOffset = offset * (i + 0.5) + baseOffset;
+        const layerTransform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translateZ(${layerOffset}px)`;
+
+        if (projectedFocus && data.renderFocusAmount > 0) {
+          const focusLayerTransform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${focusYDeg}deg) rotateY(${focusXDeg}deg) translateZ(${layerOffset}px)`;
+          const layerProjection = createPlaneProjection(
+            focusLayerTransform,
+            imageWidth,
+            imageHeight,
+          );
+          const layerPoint = layerProjection
+            ? unprojectPoint(layerProjection, projectedFocus)
+            : null;
+
+          if (layerPoint) {
+            const translateX =
+              (layerPoint.x - focusPoint.x) * data.renderFocusAmount;
+            const translateY =
+              (layerPoint.y - focusPoint.y) * data.renderFocusAmount;
+            imgLayer.style.transform = `perspective(${CSS_PERSPECTIVE}px) rotateX(${yDeg}deg) rotateY(${xDeg}deg) translate3d(${translateX}px, ${translateY}px, ${layerOffset}px)`;
+            continue;
+          }
+        }
+
+        imgLayer.style.transform = layerTransform;
       }
 
-      window.requestAnimationFrame(updateStyles);
+      animationFrame = window.requestAnimationFrame(updateStyles);
     }
     updateStyles();
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+    };
   }, []);
 
   return (
     <>
-      <div id="depth" className="frame pointer-events-none">
+      <div id="depth" ref={depthRef} className="frame">
         <img
           id="image"
+          ref={baseImageRef}
           alt=""
           className="absolute top-0 left-0 layer"
           src={photoData.src}
+          draggable={false}
+          onClick={(event) => focusAt(event.clientX, event.clientY)}
         />
 
         {photoDepthMap.map((depth, i) => (
@@ -262,8 +621,9 @@ export default function Home() {
             key={i}
             id={`image-${i}`}
             alt=""
-            className="absolute top-0 left-0 layer layer-masked"
+            className="absolute top-0 left-0 layer layer-masked pointer-events-none"
             src={photoData.src}
+            draggable={false}
             style={{
               maskImage: `url(${depth})`,
             }}
@@ -274,6 +634,7 @@ export default function Home() {
         <Select
           value={String(photo)}
           onValueChange={(e) => {
+            resetClickFocus();
             dataRef.current.forceRender = true;
             setPhoto(e as keyof typeof photos);
           }}
@@ -381,8 +742,8 @@ export default function Home() {
           value={depthModel}
           onValueChange={(value) => setDepthModel(value as DepthModel)}
         >
-          <SelectTrigger aria-label="Depth model" className="w-[190px]">
-            <SelectValue placeholder="Depth model" />
+          <SelectTrigger aria-label="Depth model" className="w-[100px]">
+            <SelectValue>{DEPTH_MODEL_SHORT_LABELS[depthModel]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -397,6 +758,36 @@ export default function Home() {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        {motionTrackingAvailable && (
+          <Button
+            type="button"
+            size="sm"
+            variant={motionTrackingStatus === "enabled" ? "default" : "outline"}
+            aria-label={
+              motionTrackingStatus === "enabled"
+                ? "Disable motion tracking"
+                : "Enable motion tracking"
+            }
+            aria-pressed={motionTrackingStatus === "enabled"}
+            aria-busy={motionTrackingStatus === "requesting"}
+            disabled={motionTrackingStatus === "requesting"}
+            onClick={toggleMotionTracking}
+          >
+            Motion Tracking
+          </Button>
+        )}
+
+        {motionTrackingStatus === "denied" && (
+          <span role="status" className="self-center px-1 text-sm">
+            Motion access was denied.
+          </span>
+        )}
+        {motionTrackingStatus === "error" && (
+          <span role="status" className="self-center px-1 text-sm">
+            Motion tracking could not be enabled.
+          </span>
+        )}
       </div>
       <SidebarLayer layers={photoDepthMap} />
       <Footer />
